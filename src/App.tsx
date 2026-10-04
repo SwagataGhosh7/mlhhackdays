@@ -15,6 +15,11 @@ import { PersonalContributionsSection } from './components/PersonalContributions
 import { exportRoadmapToPdf } from './utils/exportRoadmapPdf';
 import { signInWithGitHubFirebasePopup, signOutFirebase } from './firebase';
 import {
+  analyzeRepoDirectFromGitHub,
+  buildContributionPlanClientFallback,
+  fetchUserProfileDirectFromGitHub,
+} from './utils/clientGitHubDirect';
+import {
   INITIAL_ANALYSIS_REPORT,
   INITIAL_CONTRIBUTION_PLAN,
 } from './data/presetShowcase';
@@ -28,6 +33,7 @@ import {
 } from './types';
 
 const SESSION_STORAGE_KEY = 'contriblens_gh_session_id';
+const ACCESS_TOKEN_STORAGE_KEY = 'contriblens_gh_access_token';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
@@ -67,15 +73,37 @@ export default function App() {
         headers: getAuthHeaders(),
         credentials: 'include',
       });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data?.authenticated) {
-        setUserProfile(data as UserContributionProfile);
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data?.authenticated) {
+            setUserProfile(data as UserContributionProfile);
+            return;
+          }
+        }
+      }
+      // Fallback for static Vercel deployment using stored Firebase GitHub access token
+      const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+      if (storedAccessToken) {
+        const directProfile = await fetchUserProfileDirectFromGitHub(storedAccessToken);
+        setUserProfile(directProfile);
       } else {
         setUserProfile(null);
       }
-    } catch (err) {
-      console.error('Failed to fetch GitHub profile:', err);
+    } catch {
+      const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+      if (storedAccessToken) {
+        try {
+          const directProfile = await fetchUserProfileDirectFromGitHub(storedAccessToken);
+          setUserProfile(directProfile);
+          return;
+        } catch {
+          setUserProfile(null);
+        }
+      } else {
+        setUserProfile(null);
+      }
     } finally {
       setIsLoadingProfile(false);
     }
@@ -84,15 +112,6 @@ export default function App() {
   // Listen for OAuth popup postMessage completion
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      const origin = event.origin || '';
-      if (
-        origin &&
-        !origin.endsWith('.run.app') &&
-        !origin.includes('localhost') &&
-        origin !== window.location.origin
-      ) {
-        return;
-      }
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
         if (event.data?.sessionId) {
           localStorage.setItem(SESSION_STORAGE_KEY, event.data.sessionId);
@@ -117,19 +136,26 @@ export default function App() {
     try {
       // 1. Primary flow: Firebase Auth GithubAuthProvider popup (contriblens.firebaseapp.com/__/auth/handler)
       const { accessToken } = await signInWithGitHubFirebasePopup();
-      const tokenRes = await fetch('/api/auth/github/token-session', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ accessToken }),
-      });
-      const tokenData = await tokenRes.json();
-      if (!tokenRes.ok) {
-        throw new Error(tokenData?.error || 'Failed to establish GitHub session.');
+      localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
+
+      try {
+        const tokenRes = await fetch('/api/auth/github/token-session', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ accessToken }),
+        });
+        const contentType = tokenRes.headers.get('content-type') || '';
+        if (tokenRes.ok && contentType.includes('application/json')) {
+          const tokenData = await tokenRes.json();
+          if (tokenData.sessionId) {
+            localStorage.setItem(SESSION_STORAGE_KEY, tokenData.sessionId);
+          }
+        }
+      } catch {
+        // Static Vercel deployment without /api backend — direct GitHub API mode will use ACCESS_TOKEN_STORAGE_KEY
       }
-      if (tokenData.sessionId) {
-        localStorage.setItem(SESSION_STORAGE_KEY, tokenData.sessionId);
-      }
+
       await fetchUserProfile();
       setActiveTab('profile');
     } catch (firebaseErr: any) {
@@ -179,9 +205,10 @@ export default function App() {
         method: 'POST',
         headers: getAuthHeaders(),
         credentials: 'include',
-      });
+      }).catch(() => {});
     } finally {
       localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
       setUserProfile(null);
     }
   };
@@ -208,30 +235,46 @@ export default function App() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch('/api/contribution-plan', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({
-          repoFullName: currentReport.repo.fullName,
+      let generatedPlan: ContributionPlan | null = null;
+      try {
+        const response = await fetch('/api/contribution-plan', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({
+            repoFullName: currentReport.repo.fullName,
+            issueNumber,
+            issueTitle,
+            issueBody,
+            issueUrl,
+            language: currentReport.repo.language,
+            fileTree: currentReport.fileTree.map((f) => f.path),
+            skillLevel: currentReport.targetSkillLevel || skillLevel,
+          }),
+        });
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          generatedPlan = (await response.json()) as ContributionPlan;
+        }
+      } catch {
+        // Fallback below for static Vercel deployments
+      }
+
+      if (!generatedPlan) {
+        generatedPlan = buildContributionPlanClientFallback(
+          currentReport.repo.fullName,
           issueNumber,
           issueTitle,
           issueBody,
           issueUrl,
-          language: currentReport.repo.language,
-          fileTree: currentReport.fileTree.map((f) => f.path),
-          skillLevel: currentReport.targetSkillLevel || skillLevel,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to generate contribution plan.');
+          currentReport.repo.language,
+          currentReport.fileTree.map((f) => f.path),
+          currentReport.targetSkillLevel || skillLevel
+        );
       }
 
-      const generatedPlan = data as ContributionPlan;
       setActivePlan(generatedPlan);
-      setPlanCache((prev) => ({ ...prev, [cacheKey]: generatedPlan }));
+      setPlanCache((prev) => ({ ...prev, [cacheKey]: generatedPlan! }));
     } catch (err: any) {
       setErrorMessage(err?.message || 'Could not generate contribution plan.');
     } finally {
@@ -248,23 +291,39 @@ export default function App() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({
-          repoInput,
-          skillLevel: targetLevel,
-          focusArea,
-        }),
-      });
+      let newReport: ContribLensAnalysisResponse | null = null;
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({
+            repoInput,
+            skillLevel: targetLevel,
+            focusArea,
+          }),
+        });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to analyze repository.');
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          newReport = (await response.json()) as ContribLensAnalysisResponse;
+        } else if (response.status === 400 || response.status === 404) {
+          if (contentType.includes('application/json')) {
+            const errJson = await response.json();
+            throw new Error(errJson?.error || 'Repository not found.');
+          }
+        }
+      } catch (serverErr: any) {
+        // If static Vercel deployment (no /api server), analyze directly via GitHub REST API
+        const storedToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+        newReport = await analyzeRepoDirectFromGitHub(repoInput, targetLevel, storedToken);
       }
 
-      const newReport = data as ContribLensAnalysisResponse;
+      if (!newReport) {
+        const storedToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+        newReport = await analyzeRepoDirectFromGitHub(repoInput, targetLevel, storedToken);
+      }
+
       setReport(newReport);
       if (activeTab === 'profile') {
         setActiveTab('overview');
