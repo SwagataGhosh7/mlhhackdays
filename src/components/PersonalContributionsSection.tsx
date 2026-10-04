@@ -35,10 +35,11 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
   const [copiedCallback, setCopiedCallback] = useState<boolean>(false);
   const [avatarFailed, setAvatarFailed] = useState<boolean>(false);
 
-  const callbackUrl =
+  const callbackUrl = 'https://contriblens.firebaseapp.com/__/auth/handler';
+  const currentDomain =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/auth/callback`
-      : 'https://ais-dev-ieg7g7orgwz77ba3sdsqdi-826198571216.asia-southeast1.run.app/auth/callback';
+      ? window.location.hostname
+      : 'ais-dev-ieg7g7orgwz77ba3sdsqdi-826198571216.asia-southeast1.run.app';
 
   const handleCopyCallback = () => {
     navigator.clipboard?.writeText(callbackUrl);
@@ -114,12 +115,15 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
           </div>
 
           {/* OAuth Callback Configuration Reference */}
-          <div className="pt-5 border-t border-slate-800/80 space-y-2">
+          <div className="pt-5 border-t border-slate-800/80 space-y-3">
             <div className="text-xs font-semibold text-slate-300">
-              GitHub OAuth App Callback URL (for custom OAuth App configuration)
+              Firebase GitHub Auth Configuration (`contriblens.firebaseapp.com`)
             </div>
             <div className="flex items-center justify-between gap-3 p-3 bg-slate-950 border border-slate-800 rounded-lg">
-              <code className="text-xs font-mono text-sky-400 truncate">{callbackUrl}</code>
+              <div className="truncate">
+                <span className="text-xs text-slate-400 mr-2">GitHub Callback URL:</span>
+                <code className="text-xs font-mono text-sky-400">{callbackUrl}</code>
+              </div>
               <button
                 type="button"
                 onClick={handleCopyCallback}
@@ -129,6 +133,13 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                 <span>{copiedCallback ? 'Copied' : 'Copy URI'}</span>
               </button>
             </div>
+            <p className="text-xs text-slate-400">
+              Ensure <code className="text-slate-200 font-mono">{currentDomain}</code> is added under{' '}
+              <span className="text-slate-200 font-medium">
+                Firebase Console → Authentication → Settings → Authorized domains
+              </span>
+              .
+            </p>
           </div>
         </div>
       </div>

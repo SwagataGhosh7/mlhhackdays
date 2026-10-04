@@ -12,6 +12,8 @@ import { ContributionPlanSection } from './components/ContributionPlanSection';
 import { MaintenanceRisksSection } from './components/MaintenanceRisksSection';
 import { IssueExplorerSection } from './components/IssueExplorerSection';
 import { PersonalContributionsSection } from './components/PersonalContributionsSection';
+import { exportRoadmapToPdf } from './utils/exportRoadmapPdf';
+import { signInWithGitHubFirebasePopup, signOutFirebase } from './firebase';
 import {
   INITIAL_ANALYSIS_REPORT,
   INITIAL_CONTRIBUTION_PLAN,
@@ -113,55 +115,66 @@ export default function App() {
     setIsConnectingGitHub(true);
     setErrorMessage(null);
     try {
-      const originParam = encodeURIComponent(window.location.origin);
-      const res = await fetch(`/api/auth/github/url?origin=${originParam}`, {
+      // 1. Primary flow: Firebase Auth GithubAuthProvider popup (contriblens.firebaseapp.com/__/auth/handler)
+      const { accessToken } = await signInWithGitHubFirebasePopup();
+      const tokenRes = await fetch('/api/auth/github/token-session', {
+        method: 'POST',
         headers: getAuthHeaders(),
         credentials: 'include',
+        body: JSON.stringify({ accessToken }),
       });
-      if (!res.ok) {
-        throw new Error('Failed to initialize GitHub authentication.');
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok) {
+        throw new Error(tokenData?.error || 'Failed to establish GitHub session.');
       }
-      const data = await res.json();
+      if (tokenData.sessionId) {
+        localStorage.setItem(SESSION_STORAGE_KEY, tokenData.sessionId);
+      }
+      await fetchUserProfile();
+      setActiveTab('profile');
+    } catch (firebaseErr: any) {
+      const code = firebaseErr?.code || '';
+      const msg = firebaseErr?.message || '';
 
-      if (data.mode === 'oauth' && data.url) {
-        // Open GitHub OAuth authorization URL directly in popup per iframe guidelines
-        const authWindow = window.open(data.url, 'oauth_popup', 'width=600,height=700');
-        if (!authWindow) {
-          setErrorMessage('Popup was blocked. Please allow popups to connect your GitHub account.');
-          setIsConnectingGitHub(false);
-        }
-      } else if (data.hasServerPat) {
-        // Link using configured personal access token session
+      if (code === 'auth/popup-closed-by-user') {
+        setIsConnectingGitHub(false);
+        return;
+      }
+
+      if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
+        setErrorMessage(
+          `Add "${window.location.hostname}" to Firebase Console → Authentication → Settings → Authorized domains.`
+        );
+      } else {
+        setErrorMessage(msg || 'GitHub Firebase authentication failed.');
+      }
+
+      // Fallback: if server has GITHUB_TOKEN configured, still link session so user isn't blocked
+      try {
         const linkRes = await fetch('/api/auth/github/link-session', {
           method: 'POST',
           headers: getAuthHeaders(),
           credentials: 'include',
         });
-        const linkData = await linkRes.json();
-        if (!linkRes.ok) {
-          throw new Error(linkData?.error || 'Failed to link GitHub account.');
+        if (linkRes.ok) {
+          const linkData = await linkRes.json();
+          if (linkData.sessionId) {
+            localStorage.setItem(SESSION_STORAGE_KEY, linkData.sessionId);
+          }
+          await fetchUserProfile();
+          setActiveTab('profile');
         }
-        if (linkData.sessionId) {
-          localStorage.setItem(SESSION_STORAGE_KEY, linkData.sessionId);
-        }
-        await fetchUserProfile();
-        setActiveTab('profile');
-        setIsConnectingGitHub(false);
-      } else {
-        setActiveTab('profile');
-        setErrorMessage(
-          'Configure GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in Settings > Secrets to enable GitHub OAuth.'
-        );
-        setIsConnectingGitHub(false);
+      } catch {
+        // Ignore fallback error
       }
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'GitHub authentication failed.');
+    } finally {
       setIsConnectingGitHub(false);
     }
   };
 
   const handleDisconnectGitHub = async () => {
     try {
+      await signOutFirebase();
       await fetch('/api/auth/logout', {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -322,45 +335,7 @@ export default function App() {
   };
 
   const handleExportRoadmap = () => {
-    const markdown = `# ContribLens Contribution Roadmap: ${report.repo.fullName}
-
-- **Repository**: ${report.repo.htmlUrl} (${report.repo.isPrivate ? 'Private' : 'Public'})
-- **Language**: ${report.repo.language} · **License**: ${report.repo.license}
-- **Project Health Score**: ${report.healthScore.overall}/100 (${report.healthScore.statusLabel})
-- **Target Contributor Level**: ${report.targetSkillLevel}
-
-## Active Contribution Plan: Issue #${activePlan.issueNumber} — ${activePlan.issueTitle}
-- **Difficulty**: ${activePlan.difficulty}
-- **Estimated Effort**: ${activePlan.estimatedEffort}
-- **Required Skills**: ${activePlan.skills.join(', ')}
-
-### Problem Breakdown
-- **What is happening**: ${activePlan.problemBreakdown.whatIsHappening}
-- **Root Cause Hypothesis**: ${activePlan.problemBreakdown.rootCauseHypothesis}
-- **Acceptance Criteria**: ${activePlan.problemBreakdown.acceptanceCriteria}
-
-### Target Files to Examine
-${activePlan.filesToExamine
-  .map((f) => `- \`${f.path}\` (${f.role}): ${f.whatToInspect}`)
-  .join('\n')}
-
-### Step-by-Step Execution Plan
-${activePlan.steps
-  .map(
-    (s) =>
-      `${s.stepNumber}. **${s.title}**\n   ${s.description}\n   \`\`\`bash\n   ${s.codeOrCommandHint}\n   \`\`\`\n   *Verification*: ${s.verificationCheck}`
-  )
-  .join('\n\n')}
-
-### Testing Strategy
-- **Command**: \`${activePlan.testingStrategy.testRunnerCommand}\`
-- **Test Files**: ${activePlan.testingStrategy.testFileLocations.join(', ')}
-
-### Pull Request Checklist
-${activePlan.prPreparationChecklist.map((c) => `- [ ] ${c}`).join('\n')}
-`;
-
-    navigator.clipboard?.writeText(markdown);
+    exportRoadmapToPdf(report, activePlan);
     setCopiedRoadmap(true);
     setTimeout(() => setCopiedRoadmap(false), 2200);
   };

@@ -52,7 +52,7 @@ export const RepoCommandBar: React.FC<RepoCommandBarProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-6">
           <div>
             <p className="text-xs font-mono text-sky-400 mb-1.5">
-              Open-Source &amp; Private Repository Contribution Intelligence · Powered by GitHub &amp; Gemini
+              Open-Source &amp; Private Repository Contribution Intelligence · Powered by GitHub &amp; Gemma 4
             </p>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100 [text-wrap:balance]">
               Find the right open-source problem to solve and how to contribute.

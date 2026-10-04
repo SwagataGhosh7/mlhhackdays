@@ -15,6 +15,35 @@
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased selection:bg-sky-500/30 selection:text-sky-200">
     <div id="root"></div>
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var code = params.get('code');
+          if (code && window.opener) {
+            document.body.innerHTML =
+              '<div style="padding:24px;font-family:sans-serif;color:#f1f5f9;">Completing GitHub authentication...</div>';
+            fetch('/api/auth/github/exchange', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: code }),
+              credentials: 'include'
+            })
+              .then(function (r) { return r.json(); })
+              .then(function (data) {
+                if (data && data.sessionId && window.opener) {
+                  window.opener.postMessage(
+                    { type: 'OAUTH_AUTH_SUCCESS', sessionId: data.sessionId },
+                    '*'
+                  );
+                  window.close();
+                }
+              })
+              .catch(function () {});
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

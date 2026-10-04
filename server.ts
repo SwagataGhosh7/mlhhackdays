@@ -298,6 +298,99 @@ const oauthCallbackHandler = async (req: Request, res: Response) => {
 
 app.get(['/auth/callback', '/auth/callback/'], oauthCallbackHandler);
 
+// Also intercept if GitHub redirects to root /?code=...
+app.get('/', (req: Request, res: Response, next) => {
+  if (typeof req.query.code === 'string' && req.query.code.trim()) {
+    oauthCallbackHandler(req, res);
+    return;
+  }
+  next();
+});
+
+// JSON endpoint to exchange OAuth code if popup lands on SPA shell
+app.post('/api/auth/github/exchange', async (req: Request, res: Response) => {
+  try {
+    const code = req.body?.code;
+    const clientId = process.env.GITHUB_CLIENT_ID || process.env.CLIENT_ID || '';
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET || process.env.CLIENT_SECRET || '';
+
+    if (!code || !clientId || !clientSecret) {
+      res.status(400).json({ error: 'Missing code or GitHub OAuth credentials.' });
+      return;
+    }
+
+    const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId.trim(),
+        client_secret: clientSecret.trim(),
+        code: String(code).trim(),
+      }),
+    });
+
+    const tokenData: any = await tokenRes.json();
+    const accessToken = tokenData?.access_token;
+    if (!accessToken) {
+      res.status(400).json({ error: tokenData?.error_description || 'Failed to exchange code.' });
+      return;
+    }
+
+    const sessionId = crypto.randomBytes(24).toString('hex');
+    oauthSessions.set(sessionId, {
+      sessionId,
+      accessToken,
+      authMethod: 'oauth',
+      createdAt: Date.now(),
+    });
+
+    res.setHeader(
+      'Set-Cookie',
+      `contriblens_gh_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=604800`
+    );
+
+    res.json({ sessionId });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'OAuth code exchange failed.' });
+  }
+});
+
+// Accept GitHub OAuth accessToken obtained from Firebase Auth (signInWithPopup + GithubAuthProvider)
+app.post('/api/auth/github/token-session', async (req: Request, res: Response) => {
+  try {
+    const accessToken = req.body?.accessToken;
+    if (!accessToken || typeof accessToken !== 'string') {
+      res.status(400).json({ error: 'Missing GitHub access token from Firebase Auth.' });
+      return;
+    }
+
+    const user = await fetchGitHubJson('https://api.github.com/user', accessToken.trim(), true);
+    if (!user?.login) {
+      throw new Error('Could not verify GitHub user with provided token.');
+    }
+
+    const sessionId = crypto.randomBytes(24).toString('hex');
+    oauthSessions.set(sessionId, {
+      sessionId,
+      accessToken: accessToken.trim(),
+      authMethod: 'oauth',
+      createdAt: Date.now(),
+    });
+
+    res.setHeader(
+      'Set-Cookie',
+      `contriblens_gh_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=604800`
+    );
+
+    res.json({ sessionId, login: user.login });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to establish session with Firebase GitHub token.' });
+  }
+});
+
 // Link personal GitHub account using the configured server GITHUB_TOKEN (if OAuth app credentials aren't set yet)
 app.post('/api/auth/github/link-session', async (_req: Request, res: Response) => {
   try {

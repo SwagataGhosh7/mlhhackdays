@@ -79,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={onExportRoadmap}
           className="px-3.5 py-2 text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 rounded-lg hover:bg-slate-800 hover:border-slate-600 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
         >
-          {copiedRoadmap ? 'Copied Roadmap' : 'Export Roadmap'}
+          {copiedRoadmap ? 'Downloaded PDF' : 'Export Roadmap PDF'}
         </button>
 
         {linkedUser ? (

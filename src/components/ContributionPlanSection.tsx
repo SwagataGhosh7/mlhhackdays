@@ -190,7 +190,7 @@ export const ContributionPlanSection: React.FC<ContributionPlanSectionProps> = (
         <div className="border border-slate-800 bg-slate-900/50 rounded-xl p-12 text-center space-y-3">
           <RefreshCw className="w-6 h-6 text-sky-400 animate-spin mx-auto" />
           <p className="text-sm font-semibold text-slate-200">
-            Synthesizing Step-by-Step Contribution Plan with Gemini...
+            Synthesizing Step-by-Step Contribution Plan with Gemma 4...
           </p>
           <p className="text-xs text-slate-400">
             Mapping issue requirements against {plan.repoFullName} directory structure and test suite.
