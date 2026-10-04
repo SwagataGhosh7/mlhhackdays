@@ -230,14 +230,49 @@ export interface UserAccessibleRepo {
   defaultBranch: string;
 }
 
+export interface LanguagePreferenceItem {
+  language: string;
+  repoCount: number;
+  percentage: number;
+  totalStars: number;
+}
+
+export interface DeveloperImprovementItem {
+  id: string;
+  title: string;
+  category:
+    | 'Repository Polish'
+    | 'Contribution Velocity'
+    | 'Documentation & Onboarding'
+    | 'Ecosystem Diversity'
+    | 'Community Impact';
+  priority: 'High Impact' | 'Medium Impact' | 'Quick Win';
+  metricEvidence: string;
+  currentObservation: string;
+  actionableSteps: string;
+}
+
+export interface DeveloperAnalysisReport {
+  impactScore: number;
+  archetype: string;
+  executiveSummary: string;
+  contributionStyle: string;
+  strengths: string[];
+  improvements: DeveloperImprovementItem[];
+  recommendedNextRepoTypes: string[];
+}
+
 export interface UserContributionProfile {
   authenticated: boolean;
+  isBrowsedUser?: boolean;
   oauthConfigured: boolean;
   user: GitHubUserProfile;
   accessibleRepos: UserAccessibleRepo[];
   recentPullRequests: UserContributionItem[];
   recentIssues: UserContributionItem[];
   recentCommits: UserContributionItem[];
+  languageBreakdown?: LanguagePreferenceItem[];
+  developerAnalysis?: DeveloperAnalysisReport;
   stats: {
     totalPrsAuthored: number;
     mergedPrsCount: number;
@@ -245,6 +280,7 @@ export interface UserContributionProfile {
     totalIssuesAuthored: number;
     privateReposCount: number;
     publicReposCount: number;
+    totalStarsEarned?: number;
     topLanguages: string[];
   };
 }

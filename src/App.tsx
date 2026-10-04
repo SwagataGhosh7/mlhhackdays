@@ -17,6 +17,7 @@ import { signInWithGitHubFirebasePopup, signOutFirebase } from './firebase';
 import {
   analyzeRepoDirectFromGitHub,
   buildContributionPlanClientFallback,
+  fetchGitHubUserAnalysisDirect,
   fetchUserProfileDirectFromGitHub,
 } from './utils/clientGitHubDirect';
 import {
@@ -50,10 +51,13 @@ export default function App() {
   const [copiedRoadmap, setCopiedRoadmap] = useState<boolean>(false);
   const [recentRepos, setRecentRepos] = useState<string[]>(['pallets/click']);
 
-  // GitHub OAuth & Personal Contribution Profile state
-  const [userProfile, setUserProfile] = useState<UserContributionProfile | null>(null);
-  const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(false);
+  // Separate state for Authenticated User Account vs Browsed Public GitHub Profile
+  const [authProfile, setAuthProfile] = useState<UserContributionProfile | null>(null);
+  const [isLoadingAuthProfile, setIsLoadingAuthProfile] = useState<boolean>(false);
   const [isConnectingGitHub, setIsConnectingGitHub] = useState<boolean>(false);
+
+  const [browsedProfile, setBrowsedProfile] = useState<UserContributionProfile | null>(null);
+  const [isLoadingBrowsedProfile, setIsLoadingBrowsedProfile] = useState<boolean>(false);
 
   const getAuthHeaders = useCallback((): Record<string, string> => {
     const headers: Record<string, string> = {
@@ -67,7 +71,7 @@ export default function App() {
   }, []);
 
   const fetchUserProfile = useCallback(async () => {
-    setIsLoadingProfile(true);
+    setIsLoadingAuthProfile(true);
     try {
       const res = await fetch('/api/auth/github/profile', {
         headers: getAuthHeaders(),
@@ -78,7 +82,7 @@ export default function App() {
         if (contentType.includes('application/json')) {
           const data = await res.json();
           if (data?.authenticated) {
-            setUserProfile(data as UserContributionProfile);
+            setAuthProfile(data as UserContributionProfile);
             return;
           }
         }
@@ -87,27 +91,74 @@ export default function App() {
       const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
       if (storedAccessToken) {
         const directProfile = await fetchUserProfileDirectFromGitHub(storedAccessToken);
-        setUserProfile(directProfile);
+        setAuthProfile(directProfile);
       } else {
-        setUserProfile(null);
+        setAuthProfile(null);
       }
     } catch {
       const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
       if (storedAccessToken) {
         try {
           const directProfile = await fetchUserProfileDirectFromGitHub(storedAccessToken);
-          setUserProfile(directProfile);
+          setAuthProfile(directProfile);
           return;
         } catch {
-          setUserProfile(null);
+          setAuthProfile(null);
         }
       } else {
-        setUserProfile(null);
+        setAuthProfile(null);
       }
     } finally {
-      setIsLoadingProfile(false);
+      setIsLoadingAuthProfile(false);
     }
   }, [getAuthHeaders]);
+
+  const handleBrowseGitHubUser = useCallback(
+    async (usernameInput: string) => {
+      setActiveTab('browse');
+      setIsLoadingBrowsedProfile(true);
+      setErrorMessage(null);
+      try {
+        let fetchedBrowsed: UserContributionProfile | null = null;
+        try {
+          const res = await fetch('/api/user-analysis', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            credentials: 'include',
+            body: JSON.stringify({ username: usernameInput }),
+          });
+          const contentType = res.headers.get('content-type') || '';
+          if (res.ok && contentType.includes('application/json')) {
+            fetchedBrowsed = (await res.json()) as UserContributionProfile;
+          } else if (res.status === 404 || res.status === 400) {
+            if (contentType.includes('application/json')) {
+              const errJson = await res.json();
+              throw new Error(errJson?.error || 'GitHub user not found.');
+            }
+          }
+        } catch (err: any) {
+          if ((err?.message || '').includes('not found')) {
+            throw err;
+          }
+          // Static Vercel fallback: fetch directly from GitHub REST API
+          const storedToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+          fetchedBrowsed = await fetchGitHubUserAnalysisDirect(usernameInput, storedToken);
+        }
+
+        if (!fetchedBrowsed) {
+          const storedToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+          fetchedBrowsed = await fetchGitHubUserAnalysisDirect(usernameInput, storedToken);
+        }
+
+        setBrowsedProfile(fetchedBrowsed);
+      } catch (err: any) {
+        setErrorMessage(err?.message || 'Unable to analyze GitHub user.');
+      } finally {
+        setIsLoadingBrowsedProfile(false);
+      }
+    },
+    [getAuthHeaders]
+  );
 
   // Listen for OAuth popup postMessage completion
   useEffect(() => {
@@ -209,7 +260,7 @@ export default function App() {
     } finally {
       localStorage.removeItem(SESSION_STORAGE_KEY);
       localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
-      setUserProfile(null);
+      setAuthProfile(null);
     }
   };
 
@@ -325,7 +376,7 @@ export default function App() {
       }
 
       setReport(newReport);
-      if (activeTab === 'profile') {
+      if (activeTab === 'profile' || activeTab === 'browse') {
         setActiveTab('overview');
       }
 
@@ -399,13 +450,29 @@ export default function App() {
     setTimeout(() => setCopiedRoadmap(false), 2200);
   };
 
+  const handleOpenBrowseProfileTab = () => {
+    setActiveTab('browse');
+    if (!browsedProfile && !isLoadingBrowsedProfile) {
+      handleBrowseGitHubUser('tiangolo');
+    }
+  };
+
+  const handleSelectTab = (tab: ActiveTab) => {
+    if (tab === 'browse') {
+      handleOpenBrowseProfileTab();
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
   const mobileTabs: Array<{ id: ActiveTab; label: string }> = [
     { id: 'overview', label: 'Overview' },
     { id: 'recommendations', label: 'Recommended' },
     { id: 'plan', label: 'Contribution Plan' },
     { id: 'risks', label: 'Risks' },
     { id: 'issues', label: 'Issues' },
-    { id: 'profile', label: 'My Contributions' },
+    { id: 'browse', label: 'Browse Profile' },
+    { id: 'profile', label: 'My GitHub & Repos' },
   ];
 
   return (
@@ -413,21 +480,21 @@ export default function App() {
       {/* 3-Zone Top Navigation Header */}
       <Header
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
         onExportRoadmap={handleExportRoadmap}
         copiedRoadmap={copiedRoadmap}
-        linkedUser={userProfile?.user || null}
+        authenticatedUser={authProfile?.user || null}
         onConnectGitHub={handleConnectGitHub}
         isConnectingGitHub={isConnectingGitHub}
       />
 
       {/* Mobile Navigation Bar */}
-      <div className="lg:hidden flex items-center gap-1 px-4 py-2 bg-slate-950 border-b border-slate-800 overflow-x-auto">
+      <div className="xl:hidden flex items-center gap-1 px-4 py-2 bg-slate-950 border-b border-slate-800 overflow-x-auto">
         {mobileTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleSelectTab(tab.id)}
             className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap shrink-0 ${
               activeTab === tab.id
                 ? 'bg-sky-400 text-slate-950 font-semibold'
@@ -447,10 +514,12 @@ export default function App() {
           setSkillLevel(newLevel);
         }}
         onAnalyzeRepo={handleAnalyzeRepo}
+        onBrowseUser={handleBrowseGitHubUser}
+        onOpenBrowseProfileTab={handleOpenBrowseProfileTab}
         isAnalyzing={isAnalyzing}
         errorMessage={errorMessage}
         recentRepos={recentRepos}
-        userRepos={userProfile?.accessibleRepos || []}
+        userRepos={authProfile?.accessibleRepos || []}
       />
 
       {/* Main Content Viewport */}
@@ -459,7 +528,7 @@ export default function App() {
           <OverviewSection
             report={report}
             onSelectIssueForPlan={handleSelectRecommendedIssue}
-            onNavigateTab={setActiveTab}
+            onNavigateTab={handleSelectTab}
             isGeneratingPlan={isGeneratingPlan}
           />
         )}
@@ -500,13 +569,34 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'browse' && (
+          <PersonalContributionsSection
+            mode="browse"
+            profile={browsedProfile}
+            isLoadingProfile={isLoadingBrowsedProfile}
+            onConnectGitHub={handleConnectGitHub}
+            onDisconnectGitHub={handleDisconnectGitHub}
+            onRefreshProfile={() =>
+              browsedProfile?.user?.login && handleBrowseGitHubUser(browsedProfile.user.login)
+            }
+            onBrowseGitHubUser={handleBrowseGitHubUser}
+            onAnalyzeRepoByName={(fullName) =>
+              handleAnalyzeRepo(fullName, skillLevel, 'All Areas')
+            }
+            isAnalyzingRepo={isAnalyzing}
+          />
+        )}
+
         {activeTab === 'profile' && (
           <PersonalContributionsSection
-            profile={userProfile}
-            isLoadingProfile={isLoadingProfile}
+            mode="auth"
+            profile={authProfile}
+            isLoadingProfile={isLoadingAuthProfile}
+            isConnectingGitHub={isConnectingGitHub}
             onConnectGitHub={handleConnectGitHub}
             onDisconnectGitHub={handleDisconnectGitHub}
             onRefreshProfile={fetchUserProfile}
+            onBrowseGitHubUser={handleBrowseGitHubUser}
             onAnalyzeRepoByName={(fullName) =>
               handleAnalyzeRepo(fullName, skillLevel, 'All Areas')
             }

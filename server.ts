@@ -94,9 +94,9 @@ function getGenAICandidates(): GoogleGenAI[] {
 }
 
 const FALLBACK_MODELS = [
-  'gemini-3.8-flash',
-  'gemini-flash-latest',
-  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-3-flash-preview',
+  'gemini-3.1-flash-lite-preview',
 ];
 
 function sleep(ms: number): Promise<void> {
@@ -132,19 +132,16 @@ async function generateJsonWithFallback(contents: string, config: any): Promise<
           const isTransient = /503|429|500|502|504|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded/i.test(
             statusOrMsg
           );
-          console.warn(
-            `[Gemini] Model ${modelName} (attempt ${attempt + 1}) failed: ${statusOrMsg.slice(0, 140)}`
-          );
           if (!isTransient) {
             break;
           }
-          await sleep(450 * (attempt + 1));
+          await sleep(300 * (attempt + 1));
         }
       }
     }
   }
 
-  throw lastError || new Error('All Gemini models temporarily unavailable.');
+  throw lastError || new Error('All AI models temporarily unavailable.');
 }
 
 // In-memory cache for GitHub API responses keyed by token hash + URL
@@ -559,25 +556,31 @@ app.get('/api/auth/github/profile', async (req: Request, res: Response) => {
       if (recentCommits.length >= 15) break;
     }
 
-    // Compute top languages from accessible repos
-    const langCounts: Record<string, number> = {};
-    for (const r of accessibleRepos) {
-      if (r.language && r.language !== 'Multi-language') {
-        langCounts[r.language] = (langCounts[r.language] || 0) + 1;
-      }
-    }
-    const topLanguages = Object.entries(langCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([lang]) => lang);
+    const totalPrsCount = prsSearch.total_count || recentPullRequests.length;
+    const totalIssuesCount = issuesSearch.total_count || recentIssues.length;
+
+    const { languageBreakdown, totalStarsEarned, topLanguages, developerAnalysis } =
+      await buildDeveloperAnalysisWithAI(
+        userRaw.login,
+        userRaw,
+        accessibleRepos,
+        recentPullRequests,
+        recentIssues,
+        recentCommits,
+        totalPrsCount,
+        totalIssuesCount
+      );
 
     const privateReposCount = accessibleRepos.filter((r: any) => r.isPrivate).length;
     const publicReposCount = accessibleRepos.filter((r: any) => !r.isPrivate).length;
-    const mergedPrsCount = recentPullRequests.filter((p: any) => p.state === 'merged' || p.state === 'closed').length;
+    const mergedPrsCount = recentPullRequests.filter(
+      (p: any) => p.state === 'merged' || p.state === 'closed'
+    ).length;
     const openPrsCount = recentPullRequests.filter((p: any) => p.state === 'open').length;
 
     res.json({
       authenticated: true,
+      isBrowsedUser: false,
       oauthConfigured,
       user: {
         login: userRaw.login,
@@ -599,19 +602,486 @@ app.get('/api/auth/github/profile', async (req: Request, res: Response) => {
       recentPullRequests,
       recentIssues,
       recentCommits,
+      languageBreakdown,
+      developerAnalysis,
       stats: {
-        totalPrsAuthored: prsSearch.total_count || recentPullRequests.length,
+        totalPrsAuthored: totalPrsCount,
         mergedPrsCount,
         openPrsCount,
-        totalIssuesAuthored: issuesSearch.total_count || recentIssues.length,
+        totalIssuesAuthored: totalIssuesCount,
         privateReposCount,
         publicReposCount,
+        totalStarsEarned,
         topLanguages,
       },
     });
   } catch (err: any) {
     console.error('Error fetching GitHub profile:', err);
     res.status(500).json({ error: err?.message || 'Failed to load GitHub profile.' });
+  }
+});
+
+async function buildDeveloperAnalysisWithAI(
+  login: string,
+  userRaw: any,
+  accessibleRepos: any[],
+  recentPullRequests: any[],
+  recentIssues: any[],
+  recentCommits: any[],
+  totalPrsCount: number,
+  totalIssuesCount: number
+) {
+  const langMap: Record<string, { count: number; stars: number }> = {};
+  let totalLangRepos = 0;
+  let totalStarsEarned = 0;
+
+  for (const r of accessibleRepos) {
+    totalStarsEarned += r.stars || 0;
+    const lang = r.language && r.language !== 'Multi-language' ? r.language : null;
+    if (lang) {
+      totalLangRepos += 1;
+      if (!langMap[lang]) {
+        langMap[lang] = { count: 0, stars: 0 };
+      }
+      langMap[lang].count += 1;
+      langMap[lang].stars += r.stars || 0;
+    }
+  }
+
+  const languageBreakdown = Object.entries(langMap)
+    .sort((a, b) => b[1].count - a[1].count || b[1].stars - a[1].stars)
+    .slice(0, 6)
+    .map(([language, info]) => ({
+      language,
+      repoCount: info.count,
+      percentage: totalLangRepos > 0 ? Math.max(1, Math.round((info.count / totalLangRepos) * 100)) : 0,
+      totalStars: info.stars,
+    }));
+
+  const topLanguages = languageBreakdown.slice(0, 5).map((l) => l.language);
+  const primaryLang = topLanguages[0] || 'Software Engineering';
+  const secondaryLang = topLanguages[1] || 'Open Source';
+
+  const reposWithoutDescription = accessibleRepos.filter(
+    (r) => !r.description || r.description.trim().length < 10
+  ).length;
+  const mergedPrs = recentPullRequests.filter(
+    (p) => p.state === 'merged' || p.state === 'closed'
+  ).length;
+
+  const fallbackScore = Math.min(
+    98,
+    Math.max(
+      54,
+      52 +
+        Math.min(18, Math.round(Math.log10((totalStarsEarned || 1) + 1) * 6)) +
+        Math.min(16, Math.round(Math.log10((totalPrsCount || 1) + 1) * 7)) +
+        Math.min(12, accessibleRepos.length)
+    )
+  );
+
+  const fallbackArchetype =
+    totalPrsCount >= 25 && languageBreakdown.length >= 3
+      ? `Polyglot ${primaryLang} & ${secondaryLang} Open-Source Contributor`
+      : totalStarsEarned >= 100
+      ? `${primaryLang} Maintainer & Systems Architect`
+      : totalPrsCount >= 8
+      ? `Active ${primaryLang} Collaborative Engineer`
+      : `${primaryLang} Builder & Emerging OSS Contributor`;
+
+  const fallbackAnalysis = {
+    impactScore: fallbackScore,
+    archetype: fallbackArchetype,
+    executiveSummary: `@${login} (${userRaw.name || login}) is a ${fallbackArchetype.toLowerCase()} with ${
+      userRaw.public_repos || accessibleRepos.length
+    } public repositories, ${totalPrsCount.toLocaleString()} authored pull requests, and ${totalStarsEarned.toLocaleString()} stars across sampled projects.`,
+    contributionStyle: `Primarily builds and contributes in ${
+      topLanguages.slice(0, 3).join(', ') || primaryLang
+    }, with ${recentCommits.length} recent push commits and ${
+      recentIssues.length
+    } sampled issue discussions.`,
+    strengths: [
+      topLanguages.length > 1
+        ? `Strong multi-language versatility across ${topLanguages.slice(0, 3).join(', ')} (${accessibleRepos.length} active repositories analyzed).`
+        : `Focused specialization in ${primaryLang} across ${accessibleRepos.length} repositories.`,
+      totalPrsCount > 0
+        ? `Proven collaborative workflow with ${totalPrsCount.toLocaleString()} authored pull requests (${mergedPrs} merged/resolved in recent sample).`
+        : `Consistent repository ownership with ${userRaw.public_repos || accessibleRepos.length} public repositories and ${recentCommits.length} recent push commits.`,
+      totalStarsEarned > 0
+        ? `Community traction with ${totalStarsEarned.toLocaleString()} total stars across sampled repositories and ${(userRaw.followers || 0).toLocaleString()} followers.`
+        : `Clean repository structure ready for external open-source collaboration and issue triage.`,
+    ],
+    improvements: [
+      reposWithoutDescription > 0
+        ? {
+            id: 'imp-repo-descriptions',
+            title: 'Add Technical Summaries & Topics to Undocumented Repositories',
+            category: 'Repository Polish',
+            priority: reposWithoutDescription >= 3 ? 'High Impact' : 'Quick Win',
+            metricEvidence: `${reposWithoutDescription} of ${accessibleRepos.length} sampled repositories lack a detailed description`,
+            currentObservation: `Several repositories owned by @${login} have empty or minimal summary descriptions, reducing discoverability for collaborators.`,
+            actionableSteps: `Add a concise 1-sentence architectural description, website link, and 4–6 GitHub topic tags to your top ${primaryLang} repositories, plus a quickstart section in each README.md.`,
+          }
+        : {
+            id: 'imp-release-tags',
+            title: 'Adopt Semantic Release Notes & Changelog Automation',
+            category: 'Repository Polish',
+            priority: 'Quick Win',
+            metricEvidence: `${accessibleRepos.length} well-documented repositories analyzed`,
+            currentObservation: `@${login}'s repositories maintain clear descriptions; adding structured release changelogs further improves downstream adoption.`,
+            actionableSteps: `Configure automated GitHub Releases and CHANGELOG.md generation on your flagship ${primaryLang} repositories.`,
+          },
+      totalPrsCount < 15
+        ? {
+            id: 'imp-external-prs',
+            title: `Increase External Pull Request Velocity in ${primaryLang} Projects`,
+            category: 'Contribution Velocity',
+            priority: 'High Impact',
+            metricEvidence: `${totalPrsCount} total authored pull requests vs ${accessibleRepos.length} owned/accessible repositories`,
+            currentObservation: `@${login}'s activity is weighted toward personal repository commits rather than upstream pull requests in external open-source projects.`,
+            actionableSteps: `Target 2–3 "good first issue" or scoped bug-fix issues per month in established ${primaryLang} repositories to build a verifiable public review and merge track record.`,
+          }
+        : {
+            id: 'imp-review-mentorship',
+            title: 'Expand Cross-Repository Code Reviews & Issue Triage',
+            category: 'Community Impact',
+            priority: 'Medium Impact',
+            metricEvidence: `${totalPrsCount.toLocaleString()} authored PRs and ${totalIssuesCount.toLocaleString()} authored issues`,
+            currentObservation: `@${login} already demonstrates strong PR output; the highest-leverage next step is architectural issue triage and reviewing community PRs.`,
+            actionableSteps: `Publish reproduction test cases on complex open issues and add CONTRIBUTING.md guides to your highest-starred ${primaryLang} repositories.`,
+          },
+      languageBreakdown.length <= 2
+        ? {
+            id: 'imp-ecosystem-breadth',
+            title: 'Showcase Cross-Language Tooling or Full-Stack Integration',
+            category: 'Ecosystem Diversity',
+            priority: 'Medium Impact',
+            metricEvidence: `${languageBreakdown.length} primary language(s) detected (${topLanguages.join(', ') || primaryLang})`,
+            currentObservation: `Most public repositories are concentrated in ${primaryLang}, which shows depth but limits visibility across adjacent ecosystems.`,
+            actionableSteps: `Contribute tests, SDK bindings, or CLI tooling connecting ${primaryLang} with TypeScript, Rust, or Go to broaden your engineering profile.`,
+          }
+        : {
+            id: 'imp-ci-docs-standardization',
+            title: 'Standardize Automated Test Suites & Release Workflows',
+            category: 'Documentation & Onboarding',
+            priority: 'Quick Win',
+            metricEvidence: `${languageBreakdown.length} languages active (${topLanguages.slice(0, 3).join(', ')})`,
+            currentObservation: `Maintaining projects across multiple languages benefits from standardized CI workflows and contributor setup scripts.`,
+            actionableSteps: `Add GitHub Actions test workflows and a unified CONTRIBUTING.md checklist to your top 3 most recently updated repositories.`,
+          },
+    ],
+    recommendedNextRepoTypes: [
+      `${primaryLang} core libraries & developer tooling`,
+      secondaryLang !== 'Open Source'
+        ? `${secondaryLang} frameworks & SDK integrations`
+        : 'Automated testing & documentation infrastructure',
+      'High-velocity open-source CLI and API ecosystems',
+    ],
+  };
+
+  try {
+    const aiResult = await generateJsonWithFallback(
+      `Analyze this GitHub developer profile (@${login}) and generate a Developer Contribution Intelligence & Improvement Report.
+Ground every insight and improvement recommendation strictly in the provided telemetry.
+
+Developer Telemetry JSON:
+${JSON.stringify(
+  {
+    login,
+    name: userRaw.name || login,
+    bio: userRaw.bio || '',
+    publicRepos: userRaw.public_repos || accessibleRepos.length,
+    followers: userRaw.followers || 0,
+    totalStarsEarned,
+    totalPrsCount,
+    totalIssuesCount,
+    reposWithoutDescription,
+    languageBreakdown,
+    sampleRepos: accessibleRepos.slice(0, 8).map((r: any) => ({
+      name: r.fullName,
+      language: r.language,
+      stars: r.stars,
+      description: r.description,
+    })),
+    samplePullRequests: recentPullRequests.slice(0, 6).map((p: any) => ({
+      repo: p.repoFullName,
+      title: p.title,
+      state: p.state,
+    })),
+  },
+  null,
+  2
+)}`,
+      {
+        systemInstruction:
+          'You are ContribLens, an open-source engineering career and contribution intelligence engine powered by Gemma 4. Provide concrete, metric-backed analysis and actionable improvements for GitHub developers.',
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            impactScore: { type: Type.INTEGER },
+            archetype: { type: Type.STRING },
+            executiveSummary: { type: Type.STRING },
+            contributionStyle: { type: Type.STRING },
+            strengths: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+            improvements: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  category: {
+                    type: Type.STRING,
+                    description:
+                      'One of: Repository Polish, Contribution Velocity, Documentation & Onboarding, Ecosystem Diversity, Community Impact',
+                  },
+                  priority: {
+                    type: Type.STRING,
+                    description: 'One of: High Impact, Medium Impact, Quick Win',
+                  },
+                  metricEvidence: { type: Type.STRING },
+                  currentObservation: { type: Type.STRING },
+                  actionableSteps: { type: Type.STRING },
+                },
+                required: [
+                  'id',
+                  'title',
+                  'category',
+                  'priority',
+                  'metricEvidence',
+                  'currentObservation',
+                  'actionableSteps',
+                ],
+              },
+            },
+            recommendedNextRepoTypes: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+          required: [
+            'impactScore',
+            'archetype',
+            'executiveSummary',
+            'contributionStyle',
+            'strengths',
+            'improvements',
+            'recommendedNextRepoTypes',
+          ],
+        },
+      }
+    );
+
+    return {
+      languageBreakdown,
+      totalStarsEarned,
+      topLanguages,
+      developerAnalysis: aiResult || fallbackAnalysis,
+    };
+  } catch {
+    return {
+      languageBreakdown,
+      totalStarsEarned,
+      topLanguages,
+      developerAnalysis: fallbackAnalysis,
+    };
+  }
+}
+
+app.post('/api/user-analysis', async (req: Request, res: Response) => {
+  try {
+    const rawUsername = typeof req.body?.username === 'string' ? req.body.username : '';
+    const cleaned = rawUsername.trim().replace(/^@+/, '').replace(/\/+$/, '');
+    const urlMatch = cleaned.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9-]+)$/i);
+    const username = urlMatch ? urlMatch[1] : cleaned;
+
+    if (!username || !/^[a-zA-Z0-9-]+$/.test(username)) {
+      res.status(400).json({
+        error: 'Please enter a valid GitHub username (e.g., "tiangolo", "torvalds", or "@mitsuhiko").',
+      });
+      return;
+    }
+
+    const activeToken = resolveGitHubToken(req);
+    let userRaw: any;
+    try {
+      userRaw = await fetchGitHubJson(
+        `https://api.github.com/users/${encodeURIComponent(username)}`,
+        activeToken
+      );
+    } catch (err: any) {
+      if ((err?.message || '').includes('404')) {
+        res.status(404).json({ error: `GitHub user "@${username}" was not found.` });
+        return;
+      }
+      throw err;
+    }
+
+    const login = userRaw.login || username;
+
+    const [reposResult, prsResult, issuesResult, eventsResult] = await Promise.allSettled([
+      fetchGitHubJson(
+        `https://api.github.com/users/${encodeURIComponent(login)}/repos?sort=updated&per_page=35`,
+        activeToken
+      ),
+      fetchGitHubJson(
+        `https://api.github.com/search/issues?q=author:${encodeURIComponent(login)}+type:pr&sort=updated&per_page=15`,
+        activeToken
+      ),
+      fetchGitHubJson(
+        `https://api.github.com/search/issues?q=author:${encodeURIComponent(login)}+type:issue&sort=updated&per_page=15`,
+        activeToken
+      ),
+      fetchGitHubJson(
+        `https://api.github.com/users/${encodeURIComponent(login)}/events/public?per_page=35`,
+        activeToken
+      ),
+    ]);
+
+    const reposRaw =
+      reposResult.status === 'fulfilled' && Array.isArray(reposResult.value)
+        ? reposResult.value
+        : [];
+    const prsSearch =
+      prsResult.status === 'fulfilled' ? prsResult.value : { total_count: 0, items: [] };
+    const issuesSearch =
+      issuesResult.status === 'fulfilled' ? issuesResult.value : { total_count: 0, items: [] };
+    const eventsRaw =
+      eventsResult.status === 'fulfilled' && Array.isArray(eventsResult.value)
+        ? eventsResult.value
+        : [];
+
+    const accessibleRepos = reposRaw.map((r: any) => ({
+      fullName: r.full_name,
+      name: r.name,
+      owner: r.owner?.login || login,
+      isPrivate: Boolean(r.private),
+      description: r.description || '',
+      language: r.language || 'Multi-language',
+      stars: r.stargazers_count || 0,
+      openIssuesCount: r.open_issues_count || 0,
+      updatedAt: r.updated_at || new Date().toISOString(),
+      pushedAt: r.pushed_at || new Date().toISOString(),
+      htmlUrl: r.html_url,
+      defaultBranch: r.default_branch || 'main',
+    }));
+
+    const extractRepoNameFromApiUrl = (repoUrl: string) => {
+      const m = (repoUrl || '').match(/repos\/([^/]+\/[^/]+)$/);
+      return m ? m[1] : 'unknown/repo';
+    };
+
+    const recentPullRequests = (prsSearch.items || []).map((pr: any) => ({
+      id: pr.id,
+      type: 'pr' as const,
+      title: pr.title || 'Pull Request',
+      repoFullName: extractRepoNameFromApiUrl(pr.repository_url),
+      number: pr.number,
+      state: pr.pull_request?.merged_at ? 'merged' : pr.state || 'open',
+      createdAt: pr.created_at,
+      updatedAt: pr.updated_at,
+      htmlUrl: pr.html_url,
+    }));
+
+    const recentIssues = (issuesSearch.items || []).map((iss: any) => ({
+      id: iss.id,
+      type: 'issue' as const,
+      title: iss.title || 'Issue',
+      repoFullName: extractRepoNameFromApiUrl(iss.repository_url),
+      number: iss.number,
+      state: iss.state || 'open',
+      createdAt: iss.created_at,
+      updatedAt: iss.updated_at,
+      htmlUrl: iss.html_url,
+    }));
+
+    const recentCommits: any[] = [];
+    for (const ev of eventsRaw) {
+      if (ev.type === 'PushEvent' && Array.isArray(ev.payload?.commits)) {
+        const repoName = ev.repo?.name || 'repository';
+        for (const c of ev.payload.commits) {
+          recentCommits.push({
+            id: c.sha,
+            type: 'commit' as const,
+            title: (c.message || 'Commit').split('\n')[0],
+            repoFullName: repoName,
+            sha: (c.sha || '').slice(0, 7),
+            state: 'committed',
+            createdAt: ev.created_at,
+            updatedAt: ev.created_at,
+            htmlUrl: `https://github.com/${repoName}/commit/${c.sha}`,
+          });
+          if (recentCommits.length >= 15) break;
+        }
+      }
+      if (recentCommits.length >= 15) break;
+    }
+
+    const totalPrsCount = prsSearch.total_count || recentPullRequests.length;
+    const totalIssuesCount = issuesSearch.total_count || recentIssues.length;
+
+    const { languageBreakdown, totalStarsEarned, topLanguages, developerAnalysis } =
+      await buildDeveloperAnalysisWithAI(
+        login,
+        userRaw,
+        accessibleRepos,
+        recentPullRequests,
+        recentIssues,
+        recentCommits,
+        totalPrsCount,
+        totalIssuesCount
+      );
+
+    const privateReposCount = accessibleRepos.filter((r: any) => r.isPrivate).length;
+    const publicReposCount = accessibleRepos.filter((r: any) => !r.isPrivate).length;
+    const mergedPrsCount = recentPullRequests.filter(
+      (p: any) => p.state === 'merged' || p.state === 'closed'
+    ).length;
+    const openPrsCount = recentPullRequests.filter((p: any) => p.state === 'open').length;
+
+    res.json({
+      authenticated: true,
+      isBrowsedUser: true,
+      oauthConfigured: true,
+      user: {
+        login: userRaw.login,
+        name: userRaw.name || userRaw.login,
+        avatarUrl: userRaw.avatar_url || '',
+        htmlUrl: userRaw.html_url || `https://github.com/${userRaw.login}`,
+        bio: userRaw.bio || '',
+        company: userRaw.company || '',
+        location: userRaw.location || '',
+        publicRepos: userRaw.public_repos || publicReposCount,
+        privateRepos: privateReposCount,
+        followers: userRaw.followers || 0,
+        following: userRaw.following || 0,
+        createdAt: userRaw.created_at || new Date().toISOString(),
+        authMethod: 'oauth',
+      },
+      accessibleRepos,
+      recentPullRequests,
+      recentIssues,
+      recentCommits,
+      languageBreakdown,
+      developerAnalysis,
+      stats: {
+        totalPrsAuthored: totalPrsCount,
+        mergedPrsCount,
+        openPrsCount,
+        totalIssuesAuthored: totalIssuesCount,
+        privateReposCount,
+        publicReposCount,
+        totalStarsEarned,
+        topLanguages,
+      },
+    });
+  } catch (err: any) {
+    console.error('Error in /api/user-analysis:', err);
+    res.status(500).json({ error: err?.message || 'Failed to analyze GitHub user.' });
   }
 });
 
@@ -1440,8 +1910,7 @@ ${JSON.stringify(promptContext, null, 2)}`,
           },
         }
       );
-    } catch (aiErr) {
-      console.warn('All Gemini models returned transient error; using live GitHub telemetry synthesis:', aiErr);
+    } catch {
       aiJson = buildLiveTelemetryAnalysisFallback(
         repoMetadata,
         stats,
@@ -1646,8 +2115,7 @@ Requirements:
           },
         }
       );
-    } catch (aiErr) {
-      console.warn('All Gemini models returned transient error on plan; using live telemetry synthesis:', aiErr);
+    } catch {
       planJson = buildLiveTelemetryPlanFallback(
         repoFullName,
         issueNumber,
