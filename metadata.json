@@ -1,0 +1,6 @@
+{
+  "name": "ContribLens",
+  "description": "AI-powered open-source contribution intelligence platform that analyzes GitHub repositories to uncover project health, maintenance risks, matched issues, and step-by-step contribution plans.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
