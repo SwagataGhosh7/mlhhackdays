@@ -452,9 +452,6 @@ export default function App() {
 
   const handleOpenBrowseProfileTab = () => {
     setActiveTab('browse');
-    if (!browsedProfile && !isLoadingBrowsedProfile) {
-      handleBrowseGitHubUser('tiangolo');
-    }
   };
 
   const handleSelectTab = (tab: ActiveTab) => {

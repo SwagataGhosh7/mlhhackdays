@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Search, ArrowRight, RefreshCw, ExternalLink, Lock, UserSearch } from 'lucide-react';
+import { Search, ArrowRight, RefreshCw, ExternalLink, UserSearch } from 'lucide-react';
 import { RepoMetadata, SkillLevel, UserAccessibleRepo } from '../types';
-import { PRESET_REPOSITORIES } from '../data/presetShowcase';
 
 interface RepoCommandBarProps {
   repo: RepoMetadata;
@@ -25,13 +24,11 @@ export const RepoCommandBar: React.FC<RepoCommandBarProps> = ({
   onOpenBrowseProfileTab,
   isAnalyzing,
   errorMessage,
-  recentRepos,
-  userRepos,
 }) => {
   const [repoInput, setRepoInput] = useState<string>(`github.com/${repo.fullName}`);
   const [focusArea, setFocusArea] = useState<string>('All Areas');
   const [showProfileUrlBar, setShowProfileUrlBar] = useState<boolean>(false);
-  const [profileUrlInput, setProfileUrlInput] = useState<string>('https://github.com/tiangolo');
+  const [profileUrlInput, setProfileUrlInput] = useState<string>('');
 
   useEffect(() => {
     setRepoInput(`github.com/${repo.fullName}`);
@@ -69,11 +66,6 @@ export const RepoCommandBar: React.FC<RepoCommandBarProps> = ({
     const urlMatch = cleaned.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([^/\s?#]+)/i);
     const targetUsername = urlMatch ? urlMatch[1] : cleaned;
     onBrowseUser(targetUsername);
-  };
-
-  const handlePresetClick = (fullName: string) => {
-    setRepoInput(`github.com/${fullName}`);
-    onAnalyzeRepo(fullName, skillLevel, focusArea);
   };
 
   return (
@@ -207,82 +199,6 @@ export const RepoCommandBar: React.FC<RepoCommandBarProps> = ({
             </div>
           </form>
         )}
-
-        {/* Preset & Personal Repositories Bar */}
-        <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
-          <span className="text-slate-500">Quick-load repository:</span>
-          {PRESET_REPOSITORIES.map((preset) => {
-            const isCurrent = repo.fullName.toLowerCase() === preset.fullName.toLowerCase();
-            return (
-              <button
-                key={preset.fullName}
-                type="button"
-                disabled={isAnalyzing}
-                onClick={() => handlePresetClick(preset.fullName)}
-                className={`font-mono transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  isCurrent
-                    ? 'text-sky-400 font-semibold underline underline-offset-4'
-                    : 'text-slate-400 hover:text-slate-200 hover:underline underline-offset-4'
-                }`}
-              >
-                {preset.label}
-              </button>
-            );
-          })}
-
-          {userRepos.slice(0, 4).map((uRepo) => {
-            const isCurrent = repo.fullName.toLowerCase() === uRepo.fullName.toLowerCase();
-            return (
-              <button
-                key={uRepo.fullName}
-                type="button"
-                disabled={isAnalyzing}
-                onClick={() => handlePresetClick(uRepo.fullName)}
-                className={`font-mono transition-colors inline-flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer ${
-                  isCurrent
-                    ? 'text-emerald-400 font-semibold underline underline-offset-4'
-                    : 'text-emerald-400/80 hover:text-emerald-300 hover:underline underline-offset-4'
-                }`}
-              >
-                {uRepo.isPrivate && <Lock className="w-3 h-3" />}
-                <span>{uRepo.fullName}</span>
-              </button>
-            );
-          })}
-
-          {recentRepos
-            .filter(
-              (r) =>
-                !PRESET_REPOSITORIES.some((p) => p.fullName.toLowerCase() === r.toLowerCase()) &&
-                !userRepos.slice(0, 4).some((u) => u.fullName.toLowerCase() === r.toLowerCase())
-            )
-            .slice(0, 2)
-            .map((recent) => (
-              <button
-                key={recent}
-                type="button"
-                disabled={isAnalyzing}
-                onClick={() => handlePresetClick(recent)}
-                className="font-mono text-slate-400 hover:text-slate-200 hover:underline underline-offset-4 whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                {recent}
-              </button>
-            ))}
-
-          <span className="text-slate-600" aria-hidden="true">|</span>
-          <span className="text-slate-500">Quick-browse profile:</span>
-          {(['tiangolo', 'mitsuhiko', 'sindresorhus'] as const).map((username) => (
-            <button
-              key={username}
-              type="button"
-              disabled={isAnalyzing}
-              onClick={() => onBrowseUser(username)}
-              className="font-mono text-sky-400/90 hover:text-sky-300 hover:underline underline-offset-4 whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              github.com/{username}
-            </button>
-          ))}
-        </div>
 
         {/* Error Banner if any */}
         {errorMessage && (

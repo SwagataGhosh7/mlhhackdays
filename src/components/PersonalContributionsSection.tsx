@@ -25,14 +25,6 @@ interface PersonalContributionsSectionProps {
   isAnalyzingRepo: boolean;
 }
 
-const FEATURED_DEVELOPERS = [
-  'tiangolo',
-  'mitsuhiko',
-  'sindresorhus',
-  'gaearon',
-  'yyx990803',
-];
-
 export const PersonalContributionsSection: React.FC<PersonalContributionsSectionProps> = ({
   mode,
   profile,
@@ -45,7 +37,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
   onAnalyzeRepoByName,
   isAnalyzingRepo,
 }) => {
-  const [usernameQuery, setUsernameQuery] = useState<string>('https://github.com/tiangolo');
+  const [usernameQuery, setUsernameQuery] = useState<string>('');
   const [repoVisibilityFilter, setRepoVisibilityFilter] = useState<'all' | 'private' | 'public'>('all');
   const [repoSearch, setRepoSearch] = useState<string>('');
   const [historyTab, setHistoryTab] = useState<'prs' | 'issues' | 'commits'>('prs');
@@ -136,31 +128,6 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
               </button>
             </div>
           </form>
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
-            <span className="text-slate-500">Quick-paste GitHub user URL:</span>
-            {FEATURED_DEVELOPERS.map((dev) => {
-              const isCurrent = profile?.user?.login?.toLowerCase() === dev.toLowerCase();
-              return (
-                <button
-                  key={dev}
-                  type="button"
-                  disabled={isLoadingProfile}
-                  onClick={() => {
-                    setUsernameQuery(`https://github.com/${dev}`);
-                    onBrowseGitHubUser(dev);
-                  }}
-                  className={`font-mono transition-colors cursor-pointer ${
-                    isCurrent
-                      ? 'text-sky-400 font-semibold underline underline-offset-4'
-                      : 'text-slate-400 hover:text-slate-200 hover:underline underline-offset-4'
-                  }`}
-                >
-                  github.com/{dev}
-                </button>
-              );
-            })}
-          </div>
         </div>
       )}
 
