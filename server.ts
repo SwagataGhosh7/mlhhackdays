@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { Server as SocketIOServer } from 'socket.io';
+import mqtt from 'mqtt';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const systemGeminiKey = process.env.GEMINI_API_KEY;
@@ -2359,6 +2360,9 @@ interface DiscussionMessage {
   authorAvatar?: string;
   text: string;
   createdAt: string;
+  status?: 'sending' | 'delivered' | 'read';
+  deliveredAt?: string;
+  readBy: string[];
 }
 
 interface ConnectedDiscussionUser {
@@ -2372,6 +2376,8 @@ interface ConnectedDiscussionUser {
 }
 
 const DISCUSSION_STORE_PATH = path.join('/tmp', 'contriblens-discussion-store.json');
+const MQTT_EVENTS_TOPIC = 'contriblens/v3/discussion/events';
+const MQTT_SNAPSHOT_TOPIC = 'contriblens/v3/discussion/snapshot';
 
 const DEFAULT_DISCUSSION_MESSAGES: DiscussionMessage[] = [
   {
@@ -2380,7 +2386,10 @@ const DEFAULT_DISCUSSION_MESSAGES: DiscussionMessage[] = [
     authorHandle: 'contriblens-system',
     authorName: 'ContribLens Community',
     text: 'Welcome to the live General Discussion! Connect with fellow open-source contributors, share repositories you are analyzing, or ask for feedback on an issue or pull request.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+    createdAt: '2026-10-04T10:00:00.000Z',
+    status: 'delivered',
+    deliveredAt: '2026-10-04T10:00:00.000Z',
+    readBy: [],
   },
   {
     id: 'welcome-issues-1',
@@ -2388,7 +2397,10 @@ const DEFAULT_DISCUSSION_MESSAGES: DiscussionMessage[] = [
     authorHandle: 'contriblens-system',
     authorName: 'ContribLens Community',
     text: 'Use #issue-hunting to share good first issues, coordinate with other contributors so you do not duplicate PRs, or ask about reproducing a bug.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
+    createdAt: '2026-10-04T10:01:00.000Z',
+    status: 'delivered',
+    deliveredAt: '2026-10-04T10:01:00.000Z',
+    readBy: [],
   },
   {
     id: 'welcome-prs-1',
@@ -2396,9 +2408,35 @@ const DEFAULT_DISCUSSION_MESSAGES: DiscussionMessage[] = [
     authorHandle: 'contriblens-system',
     authorName: 'ContribLens Community',
     text: 'Drop your Pull Request links or Git rebase questions in #pr-reviews to get peer code review before maintainer triage.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    createdAt: '2026-10-04T10:02:00.000Z',
+    status: 'delivered',
+    deliveredAt: '2026-10-04T10:02:00.000Z',
+    readBy: [],
   },
 ];
+
+function normalizeMessage(m: any): DiscussionMessage {
+  const readBy: string[] = Array.isArray(m?.readBy)
+    ? Array.from(
+        new Set<string>(
+          m.readBy.map((r: any) => String(r).trim()).filter(Boolean)
+        )
+      )
+    : [];
+  const deliveredAt = m?.deliveredAt || m?.createdAt || new Date().toISOString();
+  return {
+    id: String(m.id),
+    channel: String(m.channel || 'general'),
+    authorHandle: String(m.authorHandle || 'contributor'),
+    authorName: String(m.authorName || m.authorHandle || 'contributor'),
+    authorAvatar: m.authorAvatar ? String(m.authorAvatar) : undefined,
+    text: String(m.text || ''),
+    createdAt: String(m.createdAt || deliveredAt),
+    deliveredAt,
+    readBy,
+    status: readBy.length > 0 ? 'read' : 'delivered',
+  };
+}
 
 function loadDiscussionMessages(): DiscussionMessage[] {
   try {
@@ -2406,7 +2444,7 @@ function loadDiscussionMessages(): DiscussionMessage[] {
       const raw = fs.readFileSync(DISCUSSION_STORE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.map(normalizeMessage);
       }
     }
   } catch {
@@ -2435,6 +2473,133 @@ const io = new SocketIOServer(httpServer, {
     methods: ['GET', 'POST'],
   },
 });
+
+function upsertServerMessage(incomingRaw: any): { msg: DiscussionMessage; changed: boolean } {
+  const incoming = normalizeMessage(incomingRaw);
+  const existingIdx = discussionMessages.findIndex((m) => m.id === incoming.id);
+  if (existingIdx === -1) {
+    discussionMessages.push(incoming);
+    if (discussionMessages.length > 300) {
+      discussionMessages.shift();
+    }
+    saveDiscussionMessages(discussionMessages);
+    return { msg: incoming, changed: true };
+  }
+
+  const current = discussionMessages[existingIdx];
+  const mergedReadBy = Array.from(new Set([...(current.readBy || []), ...(incoming.readBy || [])]));
+  const hasNewReaders = mergedReadBy.length !== (current.readBy || []).length;
+  const updated: DiscussionMessage = {
+    ...current,
+    deliveredAt: current.deliveredAt || incoming.deliveredAt,
+    readBy: mergedReadBy,
+    status: mergedReadBy.length > 0 ? 'read' : 'delivered',
+  };
+  discussionMessages[existingIdx] = updated;
+  if (hasNewReaders) {
+    saveDiscussionMessages(discussionMessages);
+  }
+  return { msg: updated, changed: hasNewReaders };
+}
+
+function applyReadReceipts(messageIds: string[], readerHandle: string): DiscussionMessage[] {
+  const cleanReader = (readerHandle || '').trim().replace(/^@+/, '');
+  if (!cleanReader || !Array.isArray(messageIds) || messageIds.length === 0) {
+    return [];
+  }
+  const idSet = new Set(messageIds);
+  const updatedList: DiscussionMessage[] = [];
+
+  for (let i = 0; i < discussionMessages.length; i++) {
+    const msg = discussionMessages[i];
+    if (!idSet.has(msg.id)) continue;
+    // Only record read receipt from OTHER participants, not the author themselves
+    if (msg.authorHandle.toLowerCase() === cleanReader.toLowerCase()) continue;
+
+    const existingReaders = Array.isArray(msg.readBy) ? msg.readBy : [];
+    const alreadyRead = existingReaders.some(
+      (r) => r.toLowerCase() === cleanReader.toLowerCase()
+    );
+    if (!alreadyRead) {
+      msg.readBy = [...existingReaders, cleanReader];
+      msg.status = 'read';
+      updatedList.push(msg);
+    }
+  }
+
+  if (updatedList.length > 0) {
+    saveDiscussionMessages(discussionMessages);
+  }
+  return updatedList;
+}
+
+// Server-side MQTT Bridge so ais-dev, ais-pre, and Vercel static clients share one unified state
+let serverMqttClient: mqtt.MqttClient | null = null;
+try {
+  serverMqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+    clientId: `contriblens-srv-${crypto.randomBytes(4).toString('hex')}`,
+    clean: true,
+    reconnectPeriod: 3000,
+  });
+
+  serverMqttClient.on('connect', () => {
+    serverMqttClient?.subscribe([MQTT_EVENTS_TOPIC, MQTT_SNAPSHOT_TOPIC], { qos: 1 });
+  });
+
+  serverMqttClient.on('message', (topic, payloadBuffer) => {
+    try {
+      const payload = JSON.parse(payloadBuffer.toString());
+      if (topic === MQTT_SNAPSHOT_TOPIC && Array.isArray(payload?.messages)) {
+        let anyChanged = false;
+        for (const m of payload.messages) {
+          if (m?.id && m?.text) {
+            const { changed } = upsertServerMessage(m);
+            if (changed) anyChanged = true;
+          }
+        }
+        if (anyChanged) {
+          io.emit('discussion:init', {
+            messages: discussionMessages.slice(-200),
+            onlineUsers: getDeduplicatedOnlineUsers(),
+          });
+        }
+      } else if (topic === MQTT_EVENTS_TOPIC) {
+        if (payload?.type === 'CHAT_MSG' && payload?.data?.id) {
+          const { msg, changed } = upsertServerMessage(payload.data);
+          if (changed) {
+            io.emit('message:created', msg);
+          }
+        } else if (
+          payload?.type === 'READ_RECEIPT' &&
+          Array.isArray(payload?.messageIds) &&
+          payload?.readerHandle
+        ) {
+          const updated = applyReadReceipts(payload.messageIds, payload.readerHandle);
+          if (updated.length > 0) {
+            io.emit('message:read_update', { messages: updated });
+          }
+        }
+      }
+    } catch {
+      // Ignore malformed MQTT frame
+    }
+  });
+} catch {
+  // Ignore if outbound MQTT blocked
+}
+
+function broadcastSnapshotToMqtt() {
+  if (serverMqttClient?.connected) {
+    serverMqttClient.publish(
+      MQTT_SNAPSHOT_TOPIC,
+      JSON.stringify({
+        messages: discussionMessages.slice(-80),
+        updatedAt: new Date().toISOString(),
+      }),
+      { qos: 1, retain: true }
+    );
+  }
+}
 
 function getDeduplicatedOnlineUsers(): ConnectedDiscussionUser[] {
   const now = Date.now();
@@ -2522,23 +2687,22 @@ io.on('connection', (socket) => {
 
   socket.on(
     'message:send',
-    (payload: {
-      id?: string;
-      channel?: string;
-      authorHandle?: string;
-      authorName?: string;
-      authorAvatar?: string;
-      text?: string;
-    }) => {
+    (
+      payload: {
+        id?: string;
+        channel?: string;
+        authorHandle?: string;
+        authorName?: string;
+        authorAvatar?: string;
+        text?: string;
+        createdAt?: string;
+      },
+      ackCallback?: (ack: { ok: boolean; message: DiscussionMessage }) => void
+    ) => {
       const text = (payload?.text || '').trim();
       if (!text) return;
 
       const msgId = payload?.id || `msg-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
-      // Idempotency check: prevent duplicate messages on retry/reconnect
-      if (discussionMessages.some((m) => m.id === msgId)) {
-        return;
-      }
-
       const userEntry = connectedUsers.get(socket.id);
       const authorHandle =
         (payload?.authorHandle || userEntry?.handle || defaultHandle)
@@ -2549,23 +2713,57 @@ io.on('connection', (socket) => {
         .trim()
         .slice(0, 60);
 
-      const newMsg: DiscussionMessage = {
+      const nowIso = new Date().toISOString();
+      const { msg } = upsertServerMessage({
         id: msgId,
         channel: (payload?.channel || 'general').trim(),
         authorHandle,
         authorName,
         authorAvatar: payload?.authorAvatar || userEntry?.avatarUrl,
         text: text.slice(0, 2000),
-        createdAt: new Date().toISOString(),
-      };
+        createdAt: payload?.createdAt || nowIso,
+        deliveredAt: nowIso,
+        status: 'delivered',
+        readBy: [],
+      });
 
-      discussionMessages.push(newMsg);
-      if (discussionMessages.length > 300) {
-        discussionMessages.shift();
+      if (typeof ackCallback === 'function') {
+        ackCallback({ ok: true, message: msg });
       }
-      saveDiscussionMessages(discussionMessages);
 
-      io.emit('message:created', newMsg);
+      io.emit('message:created', msg);
+      if (serverMqttClient?.connected) {
+        serverMqttClient.publish(
+          MQTT_EVENTS_TOPIC,
+          JSON.stringify({ type: 'CHAT_MSG', data: msg }),
+          { qos: 1 }
+        );
+        broadcastSnapshotToMqtt();
+      }
+    }
+  );
+
+  socket.on(
+    'message:read',
+    (payload: { messageIds?: string[]; readerHandle?: string; channel?: string }) => {
+      const userEntry = connectedUsers.get(socket.id);
+      const readerHandle = payload?.readerHandle || userEntry?.handle || '';
+      const updated = applyReadReceipts(payload?.messageIds || [], readerHandle);
+      if (updated.length > 0) {
+        io.emit('message:read_update', { messages: updated });
+        if (serverMqttClient?.connected) {
+          serverMqttClient.publish(
+            MQTT_EVENTS_TOPIC,
+            JSON.stringify({
+              type: 'READ_RECEIPT',
+              messageIds: updated.map((m) => m.id),
+              readerHandle,
+            }),
+            { qos: 1 }
+          );
+          broadcastSnapshotToMqtt();
+        }
+      }
     }
   );
 
@@ -2612,7 +2810,7 @@ app.get('/api/discussion/state', (req: Request, res: Response) => {
 
 app.post('/api/discussion/message', (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  const { id, channel, authorHandle, authorName, authorAvatar, text } = req.body || {};
+  const { id, channel, authorHandle, authorName, authorAvatar, text, createdAt } = req.body || {};
   const cleanText = (text || '').trim();
   if (!cleanText) {
     res.status(400).json({ error: 'Message text is required.' });
@@ -2620,31 +2818,59 @@ app.post('/api/discussion/message', (req: Request, res: Response) => {
   }
 
   const msgId = id || `msg-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
-  const existing = discussionMessages.find((m) => m.id === msgId);
-  if (existing) {
-    res.json({ message: existing });
-    return;
-  }
-
   const handle = (authorHandle || 'contributor').trim().replace(/^@+/, '').slice(0, 39);
-  const newMsg: DiscussionMessage = {
+  const nowIso = new Date().toISOString();
+
+  const { msg } = upsertServerMessage({
     id: msgId,
     channel: (channel || 'general').trim(),
     authorHandle: handle,
     authorName: (authorName || handle).trim().slice(0, 60),
     authorAvatar: authorAvatar || undefined,
     text: cleanText.slice(0, 2000),
-    createdAt: new Date().toISOString(),
-  };
+    createdAt: createdAt || nowIso,
+    deliveredAt: nowIso,
+    status: 'delivered',
+    readBy: [],
+  });
 
-  discussionMessages.push(newMsg);
-  if (discussionMessages.length > 300) {
-    discussionMessages.shift();
+  io.emit('message:created', msg);
+  if (serverMqttClient?.connected) {
+    serverMqttClient.publish(
+      MQTT_EVENTS_TOPIC,
+      JSON.stringify({ type: 'CHAT_MSG', data: msg }),
+      { qos: 1 }
+    );
+    broadcastSnapshotToMqtt();
   }
-  saveDiscussionMessages(discussionMessages);
+  res.json({ message: msg });
+});
 
-  io.emit('message:created', newMsg);
-  res.json({ message: newMsg });
+app.post('/api/discussion/read', (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const { messageIds, readerHandle } = req.body || {};
+  const updated = applyReadReceipts(
+    Array.isArray(messageIds) ? messageIds : [],
+    String(readerHandle || '')
+  );
+
+  if (updated.length > 0) {
+    io.emit('message:read_update', { messages: updated });
+    if (serverMqttClient?.connected) {
+      serverMqttClient.publish(
+        MQTT_EVENTS_TOPIC,
+        JSON.stringify({
+          type: 'READ_RECEIPT',
+          messageIds: updated.map((m) => m.id),
+          readerHandle,
+        }),
+        { qos: 1 }
+      );
+      broadcastSnapshotToMqtt();
+    }
+  }
+
+  res.json({ updatedMessages: updated });
 });
 
 async function startServer() {
