@@ -2142,6 +2142,208 @@ Requirements:
   }
 });
 
+async function generateTextWithFallback(contents: string, systemInstruction: string): Promise<string> {
+  const clients = getGenAICandidates();
+  let lastError: any = null;
+
+  for (const ai of clients) {
+    for (let mIdx = 0; mIdx < FALLBACK_MODELS.length; mIdx++) {
+      const modelName = FALLBACK_MODELS[mIdx];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents,
+            config: {
+              systemInstruction,
+            },
+          });
+          const text = response.text?.trim();
+          if (text) {
+            return text;
+          }
+        } catch (err: any) {
+          lastError = err;
+          const statusOrMsg = `${err?.status || ''} ${err?.code || ''} ${err?.message || ''}`;
+          const isKeyError = /400|401|403|API_KEY_INVALID|PERMISSION_DENIED/i.test(statusOrMsg);
+          if (isKeyError) {
+            mIdx = FALLBACK_MODELS.length;
+            break;
+          }
+          const isTransient = /503|429|500|502|504|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded/i.test(
+            statusOrMsg
+          );
+          if (!isTransient) {
+            break;
+          }
+          await sleep(250 * (attempt + 1));
+        }
+      }
+    }
+  }
+
+  throw lastError || new Error('All AI models temporarily unavailable.');
+}
+
+function buildContribBotFallbackAnswer(userMessage: string, context: any): string {
+  const q = (userMessage || '').toLowerCase();
+  const repoName = context?.repoFullName || 'pallets/click';
+  const language = context?.repoLanguage || 'Python';
+  const skillLevel = context?.skillLevel || 'Beginner';
+  const activeIssueNum = context?.activeIssueNumber || 184;
+  const activeIssueTitle = context?.activeIssueTitle || 'Fix issue in repository';
+  const files: string[] = Array.isArray(context?.fileTreeSample) ? context.fileTreeSample : [];
+  const topIssues: any[] = Array.isArray(context?.recommendedIssues) ? context.recommendedIssues : [];
+
+  const testCmd =
+    language.toLowerCase().includes('python')
+      ? 'pytest -v'
+      : language.toLowerCase().includes('rust')
+      ? 'cargo test'
+      : language.toLowerCase().includes('go')
+      ? 'go test ./...'
+      : 'npm test';
+
+  if (q.includes('connect') || q.includes('oauth') || q.includes('token') || q.includes('auth') || q.includes('code_exchange')) {
+    return `Here is how to resolve **GitHub Authentication & Connection** issues on ContribLens:
+
+1. **Instant Sign-In via Personal Access Token (Recommended)**:
+   - Open **My GitHub & Repos** (or click **Connect GitHub** -> **Switch Account**).
+   - Generate a token at \`https://github.com/settings/tokens/new\` with \`repo\` and \`read:user\` scopes.
+   - Paste your \`ghp_...\` or \`github_pat_...\` token and click **Authorize**. This works on both AI Studio and Vercel without needing OAuth callback URLs.
+2. **Fixing Firebase \`CODE_EXCHANGE (auth/invalid-credential)\`**:
+   - Open **GitHub Settings -> Developer settings -> OAuth Apps** and generate a fresh **Client secret**.
+   - Paste both the **Client ID** and **Client secret** into **Firebase Console -> Authentication -> Sign-in method -> GitHub** and click **Save**.`;
+  }
+
+  if (q.includes('rebase') || q.includes('conflict') || q.includes('merge') || q.includes('git') || q.includes('pr') || q.includes('pull request')) {
+    return `Here is the clean **Git & Pull Request Workflow** for **${repoName}**:
+
+\`\`\`bash
+# 1. Sync your fork with upstream main
+git remote add upstream https://github.com/${repoName}.git
+git fetch upstream
+git checkout -b fix/issue-${activeIssueNum} upstream/main
+
+# 2. Stage and commit your changes with a clear reference
+git add -A
+git commit -m "fix: resolve #${activeIssueNum} (${activeIssueTitle.slice(0, 48)})"
+
+# 3. If your branch has merge conflicts with upstream/main:
+git fetch upstream
+git rebase upstream/main
+# Resolve conflicts in your editor, then run:
+git add <resolved-files>
+git rebase --continue
+\`\`\`
+
+Before opening your PR, always run \`${testCmd}\` locally to verify no regressions were introduced.`;
+  }
+
+  if (q.includes('test') || q.includes('setup') || q.includes('install') || q.includes('run') || q.includes('local')) {
+    return `To set up **${repoName}** (${language}) locally and run the test suite:
+
+\`\`\`bash
+# 1. Clone the repository and create a feature branch
+git clone https://github.com/${repoName}.git
+cd ${repoName.split('/')[1] || 'repo'}
+git checkout -b fix/issue-${activeIssueNum}
+
+# 2. Run the automated test suite
+${testCmd}
+\`\`\`
+
+**Key files to inspect first in ${repoName}:**
+${files.slice(0, 5).map((f) => `- \`${f}\``).join('\n') || `- Inspect the core source directory and \`tests/\` folder`}`;
+  }
+
+  if (q.includes('issue') || q.includes('start') || q.includes('recommend') || q.includes('beginner') || q.includes('first')) {
+    const issueList =
+      topIssues.length > 0
+        ? topIssues
+            .slice(0, 3)
+            .map(
+              (iss: any) =>
+                `- **#${iss.issueNumber}: ${iss.title}** (${iss.difficulty || skillLevel} · ${iss.estimatedEffort || '2-4 hrs'}) — Target files: \`${(iss.likelyFiles || []).slice(0, 2).join(', ') || 'core module'}\``
+            )
+            .join('\n')
+        : `- **#${activeIssueNum}: ${activeIssueTitle}** (${skillLevel})`;
+
+    return `Based on your **${skillLevel}** level in **${repoName}**, here are the best issues to tackle right now:
+
+${issueList}
+
+Click **Generate Plan** on any recommended issue (or open the **Contribution Plan** tab) for a 6-step implementation guide and test commands.`;
+  }
+
+  return `Here is a quick guide for **${repoName}** (${language}, Health Score: **${context?.healthScore ?? 85}/100**):
+
+- **Active Target Issue**: **#${activeIssueNum}** — *${activeIssueTitle}*
+- **Recommended Test Command**: \`${testCmd}\`
+- **Relevant Repository Files**: ${files.slice(0, 4).map((f) => `\`${f}\``).join(', ') || 'See Contribution Plan tab'}
+
+You can ask me:
+- *"Which issue should I start with in ${repoName}?"*
+- *"How do I set up and run tests for #${activeIssueNum}?"*
+- *"How do I fix a Git rebase conflict before submitting my PR?"*
+- *"How do I fix GitHub OAuth / token connection?"*`;
+}
+
+app.post('/api/chat', async (req: Request, res: Response) => {
+  try {
+    const { messages = [], context = {} } = req.body || {};
+    const lastUserMsg =
+      Array.isArray(messages) && messages.length > 0
+        ? messages[messages.length - 1]?.content || ''
+        : '';
+
+    if (!lastUserMsg.trim()) {
+      res.status(400).json({ error: 'Message content is required.' });
+      return;
+    }
+
+    const conversationHistory = Array.isArray(messages)
+      ? messages
+          .slice(-8)
+          .map((m: any) => `${m.role === 'user' ? 'User' : 'ContribBot'}: ${m.content}`)
+          .join('\n\n')
+      : `User: ${lastUserMsg}`;
+
+    const prompt = `Current ContribLens Workspace Context:
+- Active Repository: ${context.repoFullName || 'pallets/click'} (${context.repoLanguage || 'Python'})
+- Repository Health Score: ${context.healthScore ?? 'N/A'}/100
+- Target Contributor Skill Level: ${context.skillLevel || 'Beginner'}
+- Active Contribution Plan Issue: #${context.activeIssueNumber || ''} "${context.activeIssueTitle || ''}"
+- Top Recommended Issues: ${JSON.stringify((context.recommendedIssues || []).slice(0, 3))}
+- Sample Repository File Tree: ${(context.fileTreeSample || []).slice(0, 25).join(', ')}
+- Active Browsed/Connected GitHub User: ${context.activeUserLogin ? `@${context.activeUserLogin}` : 'None'}
+
+Recent Conversation:
+${conversationHistory}
+
+Respond to the user's latest message as ContribBot. Be concise, practical, and directly helpful. Include terminal commands, file paths from the repository, or step-by-step troubleshooting where relevant.`;
+
+    let replyText = '';
+    try {
+      replyText = await generateTextWithFallback(
+        prompt,
+        'You are ContribBot, the built-in open-source mentor and troubleshooting assistant inside ContribLens. You help developers pick GitHub issues, understand codebases, run test suites, resolve Git/PR conflicts, and troubleshoot GitHub OAuth or Personal Access Token connections. Keep answers concise, actionable, and formatted with clean markdown.'
+      );
+    } catch {
+      replyText = buildContribBotFallbackAnswer(lastUserMsg, context);
+    }
+
+    res.json({ reply: replyText });
+  } catch {
+    res.json({
+      reply: buildContribBotFallbackAnswer(
+        req.body?.messages?.[req.body?.messages?.length - 1]?.content || '',
+        req.body?.context || {}
+      ),
+    });
+  }
+});
+
 async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 

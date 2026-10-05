@@ -13,6 +13,7 @@ import { MaintenanceRisksSection } from './components/MaintenanceRisksSection';
 import { IssueExplorerSection } from './components/IssueExplorerSection';
 import { PersonalContributionsSection } from './components/PersonalContributionsSection';
 import { GitHubAuthorizeModal } from './components/GitHubAuthorizeModal';
+import { ContribBotWidget } from './components/ContribBotWidget';
 import { exportRoadmapToPdf } from './utils/exportRoadmapPdf';
 import { signInWithGitHubFirebasePopup, signOutFirebase } from './firebase';
 import {
@@ -695,6 +696,14 @@ export default function App() {
         onCancel={handleCancelAuthorize}
         onLaunchOAuthPopup={handleLaunchOAuthPopup}
         onVerifyTokenForPreview={handleVerifyTokenForPreview}
+      />
+
+      {/* ContribBot Floating OSS Mentor & Troubleshooting Assistant */}
+      <ContribBotWidget
+        report={report}
+        activePlan={activePlan}
+        skillLevel={skillLevel}
+        activeUserLogin={authProfile?.user?.login || browsedProfile?.user?.login || null}
       />
 
       {/* Quiet Footer */}
