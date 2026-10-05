@@ -1,8 +1,10 @@
 import express, { Request, Response } from 'express';
+import http from 'http';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { Server as SocketIOServer } from 'socket.io';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const systemGeminiKey = process.env.GEMINI_API_KEY;
@@ -2344,6 +2346,256 @@ Respond to the user's latest message as ContribBot. Be concise, practical, and d
   }
 });
 
+// ============================================================================
+// REAL-TIME MULTI-USER GENERAL DISCUSSION SERVER (Socket.IO + Authoritative State)
+// ============================================================================
+
+interface DiscussionMessage {
+  id: string;
+  channel: string;
+  authorHandle: string;
+  authorName: string;
+  authorAvatar?: string;
+  repoTag?: string;
+  text: string;
+  createdAt: string;
+  reactions: Record<string, number>;
+}
+
+interface ConnectedDiscussionUser {
+  socketId: string;
+  handle: string;
+  name: string;
+  avatarUrl?: string;
+  activeChannel: string;
+  joinedAt: string;
+}
+
+const discussionMessages: DiscussionMessage[] = [
+  {
+    id: 'welcome-general-1',
+    channel: 'general',
+    authorHandle: 'contriblens-system',
+    authorName: 'ContribLens Community',
+    text: 'Welcome to the live General Discussion! Connect with fellow open-source contributors, share repositories you are analyzing, or ask for feedback on an issue or pull request.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+    reactions: { '🚀': 3, '👍': 2 },
+  },
+  {
+    id: 'welcome-issues-1',
+    channel: 'issue-hunting',
+    authorHandle: 'contriblens-system',
+    authorName: 'ContribLens Community',
+    repoTag: 'pallets/click',
+    text: 'Use #issue-hunting to share good first issues, coordinate with other contributors so you do not duplicate PRs, or ask about reproducing a bug.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
+    reactions: { '💡': 2 },
+  },
+  {
+    id: 'welcome-prs-1',
+    channel: 'pr-reviews',
+    authorHandle: 'contriblens-system',
+    authorName: 'ContribLens Community',
+    text: 'Drop your Pull Request links or Git rebase questions in #pr-reviews to get peer code review before maintainer triage.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    reactions: { '👍': 1 },
+  },
+];
+
+const connectedUsers = new Map<string, ConnectedDiscussionUser>();
+
+const httpServer = http.createServer(app);
+const io = new SocketIOServer(httpServer, {
+  path: '/socket.io',
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
+
+function getDeduplicatedOnlineUsers(): ConnectedDiscussionUser[] {
+  const byHandle = new Map<string, ConnectedDiscussionUser>();
+  for (const u of connectedUsers.values()) {
+    byHandle.set(u.handle.toLowerCase(), u);
+  }
+  return Array.from(byHandle.values());
+}
+
+io.on('connection', (socket) => {
+  const defaultHandle = `contributor-${socket.id.slice(0, 4).toLowerCase()}`;
+  connectedUsers.set(socket.id, {
+    socketId: socket.id,
+    handle: defaultHandle,
+    name: defaultHandle,
+    activeChannel: 'general',
+    joinedAt: new Date().toISOString(),
+  });
+
+  socket.join('general');
+
+  // Initial authoritative state sync on connect
+  socket.emit('discussion:init', {
+    messages: discussionMessages.slice(-200),
+    onlineUsers: getDeduplicatedOnlineUsers(),
+  });
+
+  io.emit('presence:update', {
+    onlineUsers: getDeduplicatedOnlineUsers(),
+  });
+
+  socket.on(
+    'user:identify',
+    (payload: { handle?: string; name?: string; avatarUrl?: string; activeChannel?: string }) => {
+      const current = connectedUsers.get(socket.id);
+      const cleanHandle =
+        (payload?.handle || current?.handle || defaultHandle)
+          .trim()
+          .replace(/^@+/, '')
+          .slice(0, 39) || defaultHandle;
+      const cleanName = (payload?.name || cleanHandle).trim().slice(0, 60);
+      const activeChannel = (payload?.activeChannel || current?.activeChannel || 'general').trim();
+
+      connectedUsers.set(socket.id, {
+        socketId: socket.id,
+        handle: cleanHandle,
+        name: cleanName,
+        avatarUrl: payload?.avatarUrl || current?.avatarUrl,
+        activeChannel,
+        joinedAt: current?.joinedAt || new Date().toISOString(),
+      });
+
+      io.emit('presence:update', {
+        onlineUsers: getDeduplicatedOnlineUsers(),
+      });
+    }
+  );
+
+  socket.on('channel:join', (payload: { channel: string }) => {
+    const channel = (payload?.channel || 'general').trim();
+    socket.join(channel);
+    const current = connectedUsers.get(socket.id);
+    if (current) {
+      current.activeChannel = channel;
+      connectedUsers.set(socket.id, current);
+      io.emit('presence:update', {
+        onlineUsers: getDeduplicatedOnlineUsers(),
+      });
+    }
+  });
+
+  socket.on(
+    'message:send',
+    (payload: {
+      id?: string;
+      channel?: string;
+      authorHandle?: string;
+      authorName?: string;
+      authorAvatar?: string;
+      repoTag?: string;
+      text?: string;
+    }) => {
+      const text = (payload?.text || '').trim();
+      if (!text) return;
+
+      const msgId = payload?.id || `msg-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+      // Idempotency check: prevent duplicate messages on retry/reconnect
+      if (discussionMessages.some((m) => m.id === msgId)) {
+        return;
+      }
+
+      const userEntry = connectedUsers.get(socket.id);
+      const authorHandle =
+        (payload?.authorHandle || userEntry?.handle || defaultHandle)
+          .trim()
+          .replace(/^@+/, '')
+          .slice(0, 39) || defaultHandle;
+      const authorName = (payload?.authorName || userEntry?.name || authorHandle)
+        .trim()
+        .slice(0, 60);
+
+      const newMsg: DiscussionMessage = {
+        id: msgId,
+        channel: (payload?.channel || 'general').trim(),
+        authorHandle,
+        authorName,
+        authorAvatar: payload?.authorAvatar || userEntry?.avatarUrl,
+        repoTag: payload?.repoTag ? payload.repoTag.trim() : undefined,
+        text: text.slice(0, 2000),
+        createdAt: new Date().toISOString(),
+        reactions: {},
+      };
+
+      discussionMessages.push(newMsg);
+      if (discussionMessages.length > 300) {
+        discussionMessages.shift();
+      }
+
+      io.emit('message:created', newMsg);
+    }
+  );
+
+  socket.on('message:react', (payload: { messageId: string; emoji: string }) => {
+    const target = discussionMessages.find((m) => m.id === payload?.messageId);
+    const emoji = (payload?.emoji || '').trim();
+    if (!target || !emoji) return;
+
+    target.reactions[emoji] = (target.reactions[emoji] || 0) + 1;
+    io.emit('message:updated', target);
+  });
+
+  socket.on('disconnect', () => {
+    connectedUsers.delete(socket.id);
+    io.emit('presence:update', {
+      onlineUsers: getDeduplicatedOnlineUsers(),
+    });
+  });
+});
+
+// HTTP REST Synchronization Endpoints (works alongside Socket.IO)
+app.get('/api/discussion/state', (_req: Request, res: Response) => {
+  res.json({
+    messages: discussionMessages.slice(-200),
+    onlineUsers: getDeduplicatedOnlineUsers(),
+  });
+});
+
+app.post('/api/discussion/message', (req: Request, res: Response) => {
+  const { id, channel, authorHandle, authorName, authorAvatar, repoTag, text } = req.body || {};
+  const cleanText = (text || '').trim();
+  if (!cleanText) {
+    res.status(400).json({ error: 'Message text is required.' });
+    return;
+  }
+
+  const msgId = id || `msg-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+  const existing = discussionMessages.find((m) => m.id === msgId);
+  if (existing) {
+    res.json({ message: existing });
+    return;
+  }
+
+  const handle = (authorHandle || 'contributor').trim().replace(/^@+/, '').slice(0, 39);
+  const newMsg: DiscussionMessage = {
+    id: msgId,
+    channel: (channel || 'general').trim(),
+    authorHandle: handle,
+    authorName: (authorName || handle).trim().slice(0, 60),
+    authorAvatar: authorAvatar || undefined,
+    repoTag: repoTag ? String(repoTag).trim() : undefined,
+    text: cleanText.slice(0, 2000),
+    createdAt: new Date().toISOString(),
+    reactions: {},
+  };
+
+  discussionMessages.push(newMsg);
+  if (discussionMessages.length > 300) {
+    discussionMessages.shift();
+  }
+
+  io.emit('message:created', newMsg);
+  res.json({ message: newMsg });
+});
+
 async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
@@ -2362,8 +2614,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`ContribLens server running on http://0.0.0.0:${PORT}`);
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`ContribLens server & Socket.IO running on http://0.0.0.0:${PORT}`);
   });
 }
 

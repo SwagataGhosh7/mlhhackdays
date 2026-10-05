@@ -12,6 +12,7 @@ import { ContributionPlanSection } from './components/ContributionPlanSection';
 import { MaintenanceRisksSection } from './components/MaintenanceRisksSection';
 import { IssueExplorerSection } from './components/IssueExplorerSection';
 import { PersonalContributionsSection } from './components/PersonalContributionsSection';
+import { GeneralDiscussionSection } from './components/GeneralDiscussionSection';
 import { GitHubAuthorizeModal } from './components/GitHubAuthorizeModal';
 import { ContribBotWidget } from './components/ContribBotWidget';
 import { exportRoadmapToPdf } from './utils/exportRoadmapPdf';
@@ -458,7 +459,7 @@ export default function App() {
       }
 
       setReport(newReport);
-      if (activeTab === 'profile' || activeTab === 'browse') {
+      if (activeTab === 'profile' || activeTab === 'browse' || activeTab === 'discussion') {
         setActiveTab('overview');
       }
 
@@ -550,6 +551,7 @@ export default function App() {
     { id: 'plan', label: 'Contribution Plan' },
     { id: 'risks', label: 'Risks' },
     { id: 'issues', label: 'Issues' },
+    { id: 'discussion', label: 'Discussion' },
     { id: 'browse', label: 'Browse Profile' },
     { id: 'profile', label: 'My GitHub & Repos' },
   ];
@@ -645,6 +647,16 @@ export default function App() {
             fileTree={report.fileTree}
             onGeneratePlanFromRawIssue={handleSelectRawIssue}
             isGeneratingPlan={isGeneratingPlan}
+          />
+        )}
+
+        {activeTab === 'discussion' && (
+          <GeneralDiscussionSection
+            currentRepoFullName={report.repo.fullName}
+            authenticatedUser={authProfile?.user || null}
+            onAnalyzeRepoByName={(fullName) =>
+              handleAnalyzeRepo(fullName, skillLevel, 'All Areas')
+            }
           />
         )}
 

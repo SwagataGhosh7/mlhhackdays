@@ -8,6 +8,7 @@ export type ActiveTab =
   | 'plan'
   | 'risks'
   | 'issues'
+  | 'discussion'
   | 'browse'
   | 'profile';
 
@@ -42,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'plan', label: 'Contribution Plan' },
     { id: 'risks', label: 'Maintenance Risks' },
     { id: 'issues', label: 'Issue Explorer' },
+    { id: 'discussion', label: 'General Discussion' },
     { id: 'profile', label: 'My GitHub & Repos' },
   ];
 
