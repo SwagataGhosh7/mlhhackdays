@@ -12,6 +12,7 @@ import { ContributionPlanSection } from './components/ContributionPlanSection';
 import { MaintenanceRisksSection } from './components/MaintenanceRisksSection';
 import { IssueExplorerSection } from './components/IssueExplorerSection';
 import { PersonalContributionsSection } from './components/PersonalContributionsSection';
+import { GitHubAuthorizeModal } from './components/GitHubAuthorizeModal';
 import { exportRoadmapToPdf } from './utils/exportRoadmapPdf';
 import { signInWithGitHubFirebasePopup, signOutFirebase } from './firebase';
 import {
@@ -35,6 +36,7 @@ import {
 
 const SESSION_STORAGE_KEY = 'contriblens_gh_session_id';
 const ACCESS_TOKEN_STORAGE_KEY = 'contriblens_gh_access_token';
+const AUTHORIZED_CONFIRM_KEY = 'contriblens_gh_explicitly_authorized';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
@@ -53,8 +55,11 @@ export default function App() {
 
   // Separate state for Authenticated User Account vs Browsed Public GitHub Profile
   const [authProfile, setAuthProfile] = useState<UserContributionProfile | null>(null);
+  const [pendingAuthProfile, setPendingAuthProfile] = useState<UserContributionProfile | null>(null);
+  const [isAuthorizeModalOpen, setIsAuthorizeModalOpen] = useState<boolean>(false);
   const [isLoadingAuthProfile, setIsLoadingAuthProfile] = useState<boolean>(false);
   const [isConnectingGitHub, setIsConnectingGitHub] = useState<boolean>(false);
+  const [authDiagnosticMessage, setAuthDiagnosticMessage] = useState<string | null>(null);
 
   const [browsedProfile, setBrowsedProfile] = useState<UserContributionProfile | null>(null);
   const [isLoadingBrowsedProfile, setIsLoadingBrowsedProfile] = useState<boolean>(false);
@@ -70,8 +75,7 @@ export default function App() {
     return headers;
   }, []);
 
-  const fetchUserProfile = useCallback(async () => {
-    setIsLoadingAuthProfile(true);
+  const fetchCandidateProfileFromCurrentSession = useCallback(async (): Promise<UserContributionProfile | null> => {
     try {
       const res = await fetch('/api/auth/github/profile', {
         headers: getAuthHeaders(),
@@ -82,36 +86,37 @@ export default function App() {
         if (contentType.includes('application/json')) {
           const data = await res.json();
           if (data?.authenticated) {
-            setAuthProfile(data as UserContributionProfile);
-            return;
+            return data as UserContributionProfile;
           }
         }
       }
-      // Fallback for static Vercel deployment using stored Firebase GitHub access token
       const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
       if (storedAccessToken) {
-        const directProfile = await fetchUserProfileDirectFromGitHub(storedAccessToken);
-        setAuthProfile(directProfile);
-      } else {
-        setAuthProfile(null);
+        return await fetchUserProfileDirectFromGitHub(storedAccessToken);
       }
+      return null;
     } catch {
       const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
       if (storedAccessToken) {
         try {
-          const directProfile = await fetchUserProfileDirectFromGitHub(storedAccessToken);
-          setAuthProfile(directProfile);
-          return;
+          return await fetchUserProfileDirectFromGitHub(storedAccessToken);
         } catch {
-          setAuthProfile(null);
+          return null;
         }
-      } else {
-        setAuthProfile(null);
       }
+      return null;
+    }
+  }, [getAuthHeaders]);
+
+  const fetchUserProfile = useCallback(async () => {
+    setIsLoadingAuthProfile(true);
+    try {
+      const candidate = await fetchCandidateProfileFromCurrentSession();
+      setAuthProfile(candidate);
     } finally {
       setIsLoadingAuthProfile(false);
     }
-  }, [getAuthHeaders]);
+  }, [fetchCandidateProfileFromCurrentSession]);
 
   const handleBrowseGitHubUser = useCallback(
     async (usernameInput: string) => {
@@ -160,33 +165,72 @@ export default function App() {
     [getAuthHeaders]
   );
 
-  // Listen for OAuth popup postMessage completion
+  // Listen for OAuth popup postMessage completion -> show Authorize Confirmation Modal first!
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
         if (event.data?.sessionId) {
           localStorage.setItem(SESSION_STORAGE_KEY, event.data.sessionId);
         }
+        setIsConnectingGitHub(true);
+        setIsAuthorizeModalOpen(true);
+        const candidate = await fetchCandidateProfileFromCurrentSession();
+        setPendingAuthProfile(candidate);
         setIsConnectingGitHub(false);
-        fetchUserProfile();
-        setActiveTab('profile');
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [fetchUserProfile]);
+  }, [fetchCandidateProfileFromCurrentSession]);
 
-  // Check existing session on mount
+  // Only restore session on mount if user previously clicked "Authorize @username"
   useEffect(() => {
-    fetchUserProfile();
+    const wasExplicitlyAuthorized = localStorage.getItem(AUTHORIZED_CONFIRM_KEY) === 'true';
+    if (wasExplicitlyAuthorized) {
+      fetchUserProfile();
+    }
   }, [fetchUserProfile]);
 
-  const handleConnectGitHub = async () => {
+  const handleVerifyTokenForPreview = async (personalAccessToken: string) => {
+    setErrorMessage(null);
+    setAuthDiagnosticMessage(null);
+    const cleaned = personalAccessToken.trim();
+    if (!cleaned) {
+      throw new Error('Please enter a valid GitHub Personal Access Token.');
+    }
+
+    const directProfile = await fetchUserProfileDirectFromGitHub(cleaned);
+    localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, cleaned);
+
+    try {
+      const tokenRes = await fetch('/api/auth/github/token-session', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ accessToken: cleaned }),
+      });
+      const contentType = tokenRes.headers.get('content-type') || '';
+      if (tokenRes.ok && contentType.includes('application/json')) {
+        const tokenData = await tokenRes.json();
+        if (tokenData.sessionId) {
+          localStorage.setItem(SESSION_STORAGE_KEY, tokenData.sessionId);
+        }
+      }
+    } catch {
+      // Static Vercel deployment without /api server
+    }
+
+    // Show the "Do you want to authorize @username?" confirmation screen!
+    setPendingAuthProfile(directProfile);
+    setIsAuthorizeModalOpen(true);
+  };
+
+  const handleLaunchOAuthPopup = async (loginHint?: string) => {
     setIsConnectingGitHub(true);
     setErrorMessage(null);
+    setAuthDiagnosticMessage(null);
     try {
-      // 1. Primary flow: Firebase Auth GithubAuthProvider popup (contriblens.firebaseapp.com/__/auth/handler)
-      const { accessToken } = await signInWithGitHubFirebasePopup();
+      const { accessToken } = await signInWithGitHubFirebasePopup(loginHint);
       localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
 
       try {
@@ -204,11 +248,11 @@ export default function App() {
           }
         }
       } catch {
-        // Static Vercel deployment without /api backend — direct GitHub API mode will use ACCESS_TOKEN_STORAGE_KEY
+        // Static Vercel deployment without /api backend
       }
 
-      await fetchUserProfile();
-      setActiveTab('profile');
+      const candidate = await fetchCandidateProfileFromCurrentSession();
+      setPendingAuthProfile(candidate);
     } catch (firebaseErr: any) {
       const code = firebaseErr?.code || '';
       const msg = firebaseErr?.message || '';
@@ -218,15 +262,7 @@ export default function App() {
         return;
       }
 
-      if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
-        setErrorMessage(
-          `Add "${window.location.hostname}" to Firebase Console → Authentication → Settings → Authorized domains.`
-        );
-      } else {
-        setErrorMessage(msg || 'GitHub Firebase authentication failed.');
-      }
-
-      // Fallback: if server has GITHUB_TOKEN configured, still link session so user isn't blocked
+      // Check if server has a candidate session available to preview for authorization
       try {
         const linkRes = await fetch('/api/auth/github/link-session', {
           method: 'POST',
@@ -238,14 +274,57 @@ export default function App() {
           if (linkData.sessionId) {
             localStorage.setItem(SESSION_STORAGE_KEY, linkData.sessionId);
           }
-          await fetchUserProfile();
-          setActiveTab('profile');
+          const candidate = await fetchCandidateProfileFromCurrentSession();
+          if (candidate) {
+            setPendingAuthProfile(candidate);
+            return;
+          }
         }
       } catch {
         // Ignore fallback error
       }
+
+      if (
+        code === 'auth/invalid-credential' ||
+        msg.includes('CODE_EXCHANGE') ||
+        msg.includes('malformed response')
+      ) {
+        setAuthDiagnosticMessage(
+          'The Client ID or Client Secret saved in Firebase Console (Authentication → Sign-in method → GitHub) does not match your GitHub OAuth App credentials, so GitHub rejected Firebase\'s OAuth code exchange.'
+        );
+      } else if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
+        setAuthDiagnosticMessage(
+          `Add "${window.location.hostname}" to Firebase Console → Authentication → Settings → Authorized domains.`
+        );
+      } else {
+        setAuthDiagnosticMessage(msg || 'GitHub Firebase authentication failed.');
+      }
     } finally {
       setIsConnectingGitHub(false);
+    }
+  };
+
+  const handleConnectGitHub = async () => {
+    setIsAuthorizeModalOpen(true);
+    await handleLaunchOAuthPopup();
+  };
+
+  const handleConfirmAuthorize = () => {
+    if (!pendingAuthProfile) return;
+    localStorage.setItem(AUTHORIZED_CONFIRM_KEY, 'true');
+    setAuthProfile(pendingAuthProfile);
+    setPendingAuthProfile(null);
+    setIsAuthorizeModalOpen(false);
+    setActiveTab('profile');
+  };
+
+  const handleCancelAuthorize = async () => {
+    setIsAuthorizeModalOpen(false);
+    setPendingAuthProfile(null);
+    if (!authProfile) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+      localStorage.removeItem(AUTHORIZED_CONFIRM_KEY);
     }
   };
 
@@ -260,7 +339,9 @@ export default function App() {
     } finally {
       localStorage.removeItem(SESSION_STORAGE_KEY);
       localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+      localStorage.removeItem(AUTHORIZED_CONFIRM_KEY);
       setAuthProfile(null);
+      setPendingAuthProfile(null);
     }
   };
 
@@ -590,7 +671,9 @@ export default function App() {
             profile={authProfile}
             isLoadingProfile={isLoadingAuthProfile}
             isConnectingGitHub={isConnectingGitHub}
+            authDiagnosticMessage={authDiagnosticMessage}
             onConnectGitHub={handleConnectGitHub}
+            onConnectWithToken={handleVerifyTokenForPreview}
             onDisconnectGitHub={handleDisconnectGitHub}
             onRefreshProfile={fetchUserProfile}
             onBrowseGitHubUser={handleBrowseGitHubUser}
@@ -601,6 +684,18 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Explicit GitHub Account Authorization Confirmation Popup */}
+      <GitHubAuthorizeModal
+        isOpen={isAuthorizeModalOpen}
+        pendingProfile={pendingAuthProfile}
+        isLoading={isConnectingGitHub}
+        diagnosticMessage={authDiagnosticMessage}
+        onConfirmAuthorize={handleConfirmAuthorize}
+        onCancel={handleCancelAuthorize}
+        onLaunchOAuthPopup={handleLaunchOAuthPopup}
+        onVerifyTokenForPreview={handleVerifyTokenForPreview}
+      />
 
       {/* Quiet Footer */}
       <footer className="border-t border-slate-800/80 py-6 px-6 mt-16">

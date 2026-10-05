@@ -17,7 +17,9 @@ interface PersonalContributionsSectionProps {
   profile: UserContributionProfile | null;
   isLoadingProfile: boolean;
   isConnectingGitHub?: boolean;
+  authDiagnosticMessage?: string | null;
   onConnectGitHub: () => void;
+  onConnectWithToken?: (token: string) => Promise<void>;
   onDisconnectGitHub: () => void;
   onRefreshProfile: () => void;
   onBrowseGitHubUser: (username: string) => void;
@@ -30,7 +32,9 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
   profile,
   isLoadingProfile,
   isConnectingGitHub = false,
+  authDiagnosticMessage = null,
   onConnectGitHub,
+  onConnectWithToken,
   onDisconnectGitHub,
   onRefreshProfile,
   onBrowseGitHubUser,
@@ -38,6 +42,9 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
   isAnalyzingRepo,
 }) => {
   const [usernameQuery, setUsernameQuery] = useState<string>('');
+  const [patInput, setPatInput] = useState<string>('');
+  const [isConnectingPat, setIsConnectingPat] = useState<boolean>(false);
+  const [patError, setPatError] = useState<string | null>(null);
   const [repoVisibilityFilter, setRepoVisibilityFilter] = useState<'all' | 'private' | 'public'>('all');
   const [repoSearch, setRepoSearch] = useState<string>('');
   const [historyTab, setHistoryTab] = useState<'prs' | 'issues' | 'commits'>('prs');
@@ -71,6 +78,22 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
     const urlMatch = cleaned.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([^/\s?#]+)/i);
     const targetUsername = urlMatch ? urlMatch[1] : cleaned;
     onBrowseGitHubUser(targetUsername);
+  };
+
+  const handlePatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanedToken = patInput.trim();
+    if (!cleanedToken || !onConnectWithToken) return;
+    setIsConnectingPat(true);
+    setPatError(null);
+    try {
+      await onConnectWithToken(cleanedToken);
+      setPatInput('');
+    } catch (err: any) {
+      setPatError(err?.message || 'Invalid GitHub Personal Access Token.');
+    } finally {
+      setIsConnectingPat(false);
+    }
   };
 
   const formatDate = (iso: string) => {
@@ -133,54 +156,142 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
 
       {/* Top Banner when in AUTHENTICATED MY GITHUB mode and not yet connected */}
       {mode === 'auth' && !isLoadingProfile && (!profile || !profile.authenticated) && (
-        <div className="border border-slate-800 bg-slate-900/50 rounded-xl p-8 max-w-3xl space-y-6">
+        <div className="border border-slate-800 bg-slate-900/50 rounded-xl p-8 max-w-4xl space-y-6">
           <div className="space-y-2">
             <div className="text-xs font-mono text-emerald-400">
-              GitHub OAuth Authentication &amp; Personal Repository Analysis
+              GitHub Authentication &amp; Personal Repository Analysis
             </div>
             <h2 className="text-2xl font-bold text-slate-100 [text-wrap:balance]">
               Connect your GitHub account to analyze your private &amp; public repositories.
             </h2>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Authenticate with your personal GitHub account via Firebase OAuth to unlock your private repositories, run deep repository analysis on your own projects, and track your personal pull requests, issues, and commit velocity.
+              Sign in via GitHub OAuth or paste a GitHub Personal Access Token (<code className="font-mono text-sky-300">ghp_...</code> / <code className="font-mono text-sky-300">github_pat_...</code>) to unlock your private repositories, run deep repository analysis on your own projects, and track your personal pull requests, issues, and commit velocity.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-            <div className="p-4 bg-slate-950/60 border border-slate-800/90 rounded-lg space-y-1">
-              <div className="text-xs font-mono text-emerald-400">01 · Private &amp; Public Repos</div>
-              <p className="text-xs text-slate-300">
-                Access and analyze all repositories you own or collaborate on, including private repos.
+          {authDiagnosticMessage && (
+            <div className="p-4 bg-amber-950/40 border border-amber-500/50 rounded-xl space-y-2.5 text-xs text-amber-100">
+              <div className="font-semibold text-amber-300">
+                Why Firebase returned &ldquo;CODE_EXCHANGE (auth/invalid-credential)&rdquo;:
+              </div>
+              <p className="text-slate-200 leading-relaxed">
+                {authDiagnosticMessage}
               </p>
+              <ol className="list-decimal list-inside space-y-1 text-slate-300">
+                <li>
+                  Open{' '}
+                  <a
+                    href="https://github.com/settings/developers"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-400 underline"
+                  >
+                    GitHub Settings → Developer settings → OAuth Apps
+                  </a>{' '}
+                  (must be an <strong>OAuth App</strong>, not a GitHub App) and click{' '}
+                  <strong>Generate a new client secret</strong>.
+                </li>
+                <li>
+                  Open{' '}
+                  <a
+                    href="https://console.firebase.google.com/project/contriblens/authentication/providers"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-400 underline"
+                  >
+                    Firebase Console → Authentication → Sign-in method → GitHub
+                  </a>{' '}
+                  and paste the exact <strong>Client ID</strong> and new <strong>Client secret</strong> (no spaces), then click <strong>Save</strong>.
+                </li>
+                <li>
+                  <strong>Or bypass Firebase OAuth right now:</strong> Generate a token at{' '}
+                  <a
+                    href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=ContribLens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-400 underline font-semibold"
+                  >
+                    github.com/settings/tokens/new
+                  </a>{' '}
+                  and paste it into the instant token box below.
+                </li>
+              </ol>
             </div>
-            <div className="p-4 bg-slate-950/60 border border-slate-800/90 rounded-lg space-y-1">
-              <div className="text-xs font-mono text-sky-400">02 · One-Click Repo Analysis</div>
-              <p className="text-xs text-slate-300">
-                Launch health score, maintenance risk, and issue roadmaps on any of your repositories.
-              </p>
+          )}
+
+          {/* Option 1: Direct GitHub Personal Access Token Connect (Bypasses CODE_EXCHANGE) */}
+          <div className="p-5 bg-slate-950/80 border border-emerald-500/40 rounded-xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <div className="text-xs font-mono text-emerald-400">
+                  Instant Sign-In · Works on AI Studio &amp; Vercel without OAuth Callback Setup
+                </div>
+                <h3 className="text-sm font-semibold text-slate-100 mt-0.5">
+                  Connect with GitHub Personal Access Token
+                </h3>
+              </div>
+              <a
+                href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=ContribLens"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-mono text-sky-400 hover:underline inline-flex items-center gap-1"
+              >
+                <span>Create GitHub Token (repo, read:user)</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
             </div>
-            <div className="p-4 bg-slate-950/60 border border-slate-800/90 rounded-lg space-y-1">
-              <div className="text-xs font-mono text-amber-400">03 · Personal Growth Plan</div>
-              <p className="text-xs text-slate-300">
-                Get Gemma 4 recommendations tailored to your own repositories and preferred languages.
-              </p>
-            </div>
+
+            <form onSubmit={handlePatSubmit} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+              <div className="sm:col-span-8">
+                <input
+                  type="password"
+                  value={patInput}
+                  onChange={(e) => setPatInput(e.target.value)}
+                  placeholder="Paste GitHub token (ghp_... or github_pat_...)"
+                  aria-label="GitHub Personal Access Token"
+                  className="w-full px-3.5 py-2.5 text-sm font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-400 transition-colors"
+                />
+              </div>
+              <div className="sm:col-span-4">
+                <button
+                  type="submit"
+                  disabled={isConnectingPat || !patInput.trim()}
+                  className="w-full h-full px-4 py-2.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-60 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Github className="w-4 h-4" />
+                  <span>{isConnectingPat ? 'Verifying Token...' : 'Connect with Token'}</span>
+                </button>
+              </div>
+            </form>
+
+            {patError && (
+              <div className="text-xs text-rose-300 font-mono">{patError}</div>
+            )}
           </div>
 
-          <div className="pt-2 flex flex-wrap items-center gap-4">
+          {/* Option 2: Firebase OAuth Popup */}
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-slate-800/80">
+            <div className="space-y-0.5">
+              <div className="text-xs font-semibold text-slate-200">
+                Or Connect via Firebase GitHub OAuth Popup
+              </div>
+              <div className="text-xs text-slate-400">
+                Requires matching OAuth App Client ID &amp; Client Secret in Firebase Console.
+              </div>
+            </div>
             <button
               type="button"
               disabled={isConnectingGitHub}
               onClick={onConnectGitHub}
-              className="px-5 py-2.5 text-sm font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-60 rounded-lg transition-colors inline-flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-slate-100 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-60 rounded-lg transition-colors inline-flex items-center gap-2 cursor-pointer"
             >
-              <Github className="w-4 h-4" />
-              <span>{isConnectingGitHub ? 'Connecting GitHub...' : 'Connect GitHub Account'}</span>
-              <ArrowRight className="w-4 h-4" />
+              <Github className="w-3.5 h-3.5" />
+              <span>{isConnectingGitHub ? 'Connecting...' : 'Launch GitHub OAuth Popup'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="pt-5 border-t border-slate-800/80 space-y-3">
+          <div className="pt-4 border-t border-slate-800/80 space-y-3">
             <div className="text-xs font-semibold text-slate-300">
               Firebase GitHub Auth Configuration (`contriblens.firebaseapp.com`)
             </div>

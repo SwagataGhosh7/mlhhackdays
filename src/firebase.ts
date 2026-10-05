@@ -19,15 +19,31 @@ const firebaseConfig = {
 export const firebaseApp = initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(firebaseApp);
 
-export async function signInWithGitHubFirebasePopup(): Promise<{
+export async function signInWithGitHubFirebasePopup(forceAccountLogin?: string): Promise<{
   accessToken: string;
   email?: string | null;
   displayName?: string | null;
 }> {
+  // Always sign out any cached Firebase user first so Firebase doesn't reuse a stale credential
+  try {
+    await signOut(firebaseAuth);
+  } catch {
+    // Ignore
+  }
+
   const provider = new GithubAuthProvider();
   provider.addScope('repo');
   provider.addScope('read:user');
   provider.addScope('user:email');
+
+  const customParams: Record<string, string> = {
+    allow_signup: 'true',
+    prompt: 'consent',
+  };
+  if (forceAccountLogin && forceAccountLogin.trim()) {
+    customParams.login = forceAccountLogin.trim().replace(/^@+/, '');
+  }
+  provider.setCustomParameters(customParams);
 
   const result = await signInWithPopup(firebaseAuth, provider);
   const credential = GithubAuthProvider.credentialFromResult(result);
