@@ -1,15 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import {
-  ArrowRight,
   Hash,
   MessageSquare,
   Send,
-  Tag,
   User,
   Users,
 } from 'lucide-react';
 import { GitHubUserProfile } from '../types';
+import {
+  publishMessageToFirestore,
+  subscribeToFirestoreDiscussion,
+} from '../firebase';
 
 export interface DiscussionMessageItem {
   id: string;
@@ -17,10 +19,8 @@ export interface DiscussionMessageItem {
   authorHandle: string;
   authorName: string;
   authorAvatar?: string;
-  repoTag?: string;
   text: string;
   createdAt: string;
-  reactions: Record<string, number>;
 }
 
 export interface OnlineContributor {
@@ -33,102 +33,142 @@ export interface OnlineContributor {
 }
 
 interface GeneralDiscussionSectionProps {
-  currentRepoFullName: string;
   authenticatedUser: GitHubUserProfile | null;
-  onAnalyzeRepoByName: (fullName: string) => void;
 }
 
 const HANDLE_STORAGE_KEY = 'contriblens_discussion_handle';
+const LOCAL_CACHE_KEY = 'contriblens_discussion_messages_cache';
+
+const CHANNELS = [
+  {
+    id: 'general',
+    label: 'general',
+    description: 'General open-source discussion & contributor networking',
+  },
+  {
+    id: 'issue-hunting',
+    label: 'issue-hunting',
+    description: 'Share good first issues, pair up, and avoid duplicate PRs',
+  },
+  {
+    id: 'pr-reviews',
+    label: 'pr-reviews',
+    description: 'Ask for Pull Request reviews, Git rebase help, and CI tips',
+  },
+];
 
 export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> = ({
-  currentRepoFullName,
   authenticatedUser,
-  onAnalyzeRepoByName,
 }) => {
   const [activeChannel, setActiveChannel] = useState<string>('general');
-  const [messages, setMessages] = useState<DiscussionMessageItem[]>([]);
+  const [messages, setMessages] = useState<DiscussionMessageItem[]>(() => {
+    try {
+      const cached = localStorage.getItem(LOCAL_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // Ignore
+    }
+    return [];
+  });
   const [onlineUsers, setOnlineUsers] = useState<OnlineContributor[]>([]);
   const [messageInput, setMessageInput] = useState<string>('');
-  const [attachRepoTag, setAttachRepoTag] = useState<boolean>(true);
   const [customHandle, setCustomHandle] = useState<string>(() => {
     const saved = localStorage.getItem(HANDLE_STORAGE_KEY);
     if (saved) return saved;
     const randomSuffix = Math.floor(100 + Math.random() * 900);
-    return `oss-dev-${randomSuffix}`;
+    const generated = `oss-dev-${randomSuffix}`;
+    localStorage.setItem(HANDLE_STORAGE_KEY, generated);
+    return generated;
   });
   const [isEditingHandle, setIsEditingHandle] = useState<boolean>(false);
   const [handleDraft, setHandleDraft] = useState<string>(customHandle);
 
   const socketRef = useRef<Socket | null>(null);
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const effectiveHandle = authenticatedUser?.login || customHandle;
   const effectiveName = authenticatedUser?.name || effectiveHandle;
   const effectiveAvatar = authenticatedUser?.avatarUrl;
 
-  const repoChannelId = `repo:${currentRepoFullName.toLowerCase()}`;
-
-  const channels = [
-    {
-      id: 'general',
-      label: 'general',
-      description: 'General open-source discussion & contributor networking',
-    },
-    {
-      id: 'issue-hunting',
-      label: 'issue-hunting',
-      description: 'Share good first issues, pair up, and avoid duplicate PRs',
-    },
-    {
-      id: 'pr-reviews',
-      label: 'pr-reviews',
-      description: 'Ask for Pull Request reviews, Git rebase help, and CI tips',
-    },
-    {
-      id: repoChannelId,
-      label: currentRepoFullName,
-      description: `Live contributor room for ${currentRepoFullName}`,
-    },
-  ];
-
-  // Idempotent message merger
-  const upsertMessage = (incoming: DiscussionMessageItem) => {
+  // Idempotent batch/single message merger sorted chronologically
+  const mergeMessages = useCallback((incomingList: DiscussionMessageItem[]) => {
+    if (!Array.isArray(incomingList) || incomingList.length === 0) return;
     setMessages((prev) => {
-      const existsIdx = prev.findIndex((m) => m.id === incoming.id);
-      if (existsIdx !== -1) {
-        const updated = [...prev];
-        updated[existsIdx] = incoming;
-        return updated;
+      const byId = new Map<string, DiscussionMessageItem>();
+      for (const m of prev) {
+        if (m && m.id) byId.set(m.id, m);
       }
-      return [...prev, incoming];
+      let changed = false;
+      for (const m of incomingList) {
+        if (m && m.id && m.text) {
+          if (!byId.has(m.id)) {
+            changed = true;
+          }
+          byId.set(m.id, m);
+        }
+      }
+      if (!changed && byId.size === prev.length) {
+        return prev;
+      }
+      const merged = Array.from(byId.values()).sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+      try {
+        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(merged.slice(-200)));
+      } catch {
+        // Ignore storage quota
+      }
+      return merged;
     });
-  };
+  }, []);
 
-  // Connect to Socket.IO server + initial state sync
+  // Poll server state & register active presence (guarantees sync even when proxies block WebSockets)
+  const syncFromServer = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        handle: effectiveHandle,
+        name: effectiveName,
+        channel: activeChannel,
+      });
+      if (effectiveAvatar) {
+        params.set('avatarUrl', effectiveAvatar);
+      }
+      const res = await fetch(`/api/discussion/state?${params.toString()}`, {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          if (Array.isArray(data?.messages)) {
+            mergeMessages(data.messages);
+          }
+          if (Array.isArray(data?.onlineUsers)) {
+            setOnlineUsers(data.onlineUsers);
+          }
+        }
+      }
+    } catch {
+      // Ignore network hiccup
+    }
+  }, [effectiveHandle, effectiveName, effectiveAvatar, activeChannel, mergeMessages]);
+
+  // Set up Socket.IO + HTTP Sync Interval + Firestore Real-Time Listener + BroadcastChannel
   useEffect(() => {
-    // Also fetch initial state via HTTP in parallel for instant load
-    fetch('/api/discussion/state')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.messages && Array.isArray(data.messages)) {
-          setMessages((prev) => {
-            const byId = new Map<string, DiscussionMessageItem>();
-            for (const m of prev) byId.set(m.id, m);
-            for (const m of data.messages) byId.set(m.id, m);
-            return Array.from(byId.values());
-          });
-        }
-        if (data?.onlineUsers && Array.isArray(data.onlineUsers)) {
-          setOnlineUsers(data.onlineUsers);
-        }
-      })
-      .catch(() => {});
+    syncFromServer();
+    const pollTimer = window.setInterval(syncFromServer, 1800);
 
+    // 1. Socket.IO with polling-first transport so Cloud Run / iframe proxies never hang on WS upgrade
     const socket = io({
       path: '/socket.io',
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
     });
 
     socketRef.current = socket;
@@ -147,12 +187,7 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       'discussion:init',
       (payload: { messages?: DiscussionMessageItem[]; onlineUsers?: OnlineContributor[] }) => {
         if (Array.isArray(payload?.messages)) {
-          setMessages((prev) => {
-            const byId = new Map<string, DiscussionMessageItem>();
-            for (const m of prev) byId.set(m.id, m);
-            for (const m of payload.messages!) byId.set(m.id, m);
-            return Array.from(byId.values());
-          });
+          mergeMessages(payload.messages);
         }
         if (Array.isArray(payload?.onlineUsers)) {
           setOnlineUsers(payload.onlineUsers);
@@ -162,13 +197,7 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
 
     socket.on('message:created', (newMsg: DiscussionMessageItem) => {
       if (newMsg && newMsg.id) {
-        upsertMessage(newMsg);
-      }
-    });
-
-    socket.on('message:updated', (updatedMsg: DiscussionMessageItem) => {
-      if (updatedMsg && updatedMsg.id) {
-        upsertMessage(updatedMsg);
+        mergeMessages([newMsg]);
       }
     });
 
@@ -178,11 +207,49 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       }
     });
 
+    // 2. Firebase Firestore real-time subscription (syncs across Dev URL, Shared URL, and Vercel)
+    const unsubscribeFirestore = subscribeToFirestoreDiscussion((firestoreMsgs) => {
+      mergeMessages(firestoreMsgs as DiscussionMessageItem[]);
+    });
+
+    // 3. BroadcastChannel + storage listener for instant multi-tab sync
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      bc = new BroadcastChannel('contriblens_discussion_channel');
+      bc.onmessage = (ev) => {
+        if (ev.data?.type === 'NEW_MESSAGE' && ev.data?.message) {
+          mergeMessages([ev.data.message]);
+        }
+      };
+      broadcastChannelRef.current = bc;
+    }
+
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key === LOCAL_CACHE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            mergeMessages(parsed);
+          }
+        } catch {
+          // Ignore
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
+
     return () => {
+      window.clearInterval(pollTimer);
       socket.disconnect();
       socketRef.current = null;
+      unsubscribeFirestore();
+      if (bc) {
+        bc.close();
+        broadcastChannelRef.current = null;
+      }
+      window.removeEventListener('storage', handleStorageEvent);
     };
-  }, []);
+  }, [syncFromServer, mergeMessages]);
 
   // Re-identify when user connects GitHub or changes handle/channel
   useEffect(() => {
@@ -218,61 +285,47 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
     if (!text) return;
 
     const msgId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const optimisticMsg: DiscussionMessageItem = {
+    const newMsg: DiscussionMessageItem = {
       id: msgId,
       channel: activeChannel,
       authorHandle: effectiveHandle,
       authorName: effectiveName,
       authorAvatar: effectiveAvatar,
-      repoTag: attachRepoTag ? currentRepoFullName : undefined,
       text,
       createdAt: new Date().toISOString(),
-      reactions: {},
     };
 
-    // Optimistic update with idempotent reconciliation
-    upsertMessage(optimisticMsg);
+    // 1. Optimistic local update
+    mergeMessages([newMsg]);
     setMessageInput('');
 
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('message:send', optimisticMsg);
-    } else {
-      try {
-        const res = await fetch('/api/discussion/message', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(optimisticMsg),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.message) {
-            upsertMessage(data.message);
-          }
-        }
-      } catch {
-        // Optimistic message remains visible locally
-      }
-    }
-  };
+    // 2. Broadcast immediately to other open tabs
+    broadcastChannelRef.current?.postMessage({
+      type: 'NEW_MESSAGE',
+      message: newMsg,
+    });
 
-  const handleReaction = (messageId: string, emoji: string) => {
+    // 3. Emit via Socket.IO if connected
     if (socketRef.current?.connected) {
-      socketRef.current.emit('message:react', { messageId, emoji });
-    } else {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? {
-                ...m,
-                reactions: {
-                  ...m.reactions,
-                  [emoji]: (m.reactions[emoji] || 0) + 1,
-                },
-              }
-            : m
-        )
-      );
+      socketRef.current.emit('message:send', newMsg);
     }
+
+    // 4. Always POST to /api/discussion/message so server persists & broadcasts via io.emit
+    fetch('/api/discussion/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newMsg),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.message) {
+          mergeMessages([data.message]);
+        }
+      })
+      .catch(() => {});
+
+    // 5. Publish to Firebase Firestore in parallel for cross-URL / Vercel sync
+    publishMessageToFirestore(newMsg);
   };
 
   const formatTime = (iso: string) => {
@@ -284,7 +337,7 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
   };
 
   const activeChannelMeta =
-    channels.find((c) => c.id === activeChannel) || channels[0];
+    CHANNELS.find((c) => c.id === activeChannel) || CHANNELS[0];
 
   return (
     <div className="space-y-6">
@@ -292,13 +345,13 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <div className="text-xs font-mono text-sky-400">
-            Real-Time Contributor Community · Socket.IO Multi-User Discussion
+            Real-Time Contributor Community · Live Multi-User Discussion
           </div>
           <h2 className="text-2xl font-bold text-slate-100 mt-1">
             General Discussion &amp; Issue Collaboration
           </h2>
           <p className="text-sm text-slate-300 mt-0.5">
-            Chat live with other developers, coordinate on open issues, and share repository insights in real time.
+            Chat live with other developers, coordinate on open issues, and share insights in real time.
           </p>
         </div>
       </div>
@@ -313,7 +366,7 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
               Discussion Channels
             </div>
             <div className="space-y-1">
-              {channels.map((ch) => {
+              {CHANNELS.map((ch) => {
                 const isActive = activeChannel === ch.id;
                 const count = messages.filter((m) => m.channel === ch.id).length;
                 return (
@@ -445,7 +498,7 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                     <span className="font-mono text-slate-200 truncate">@{u.handle}</span>
                   </div>
                   <span className="text-[11px] font-mono text-slate-500 truncate">
-                    #{u.activeChannel.replace(/^repo:/, '')}
+                    #{u.activeChannel}
                   </span>
                 </div>
               ))}
@@ -480,9 +533,6 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                 <MessageSquare className="w-7 h-7 text-slate-600" />
                 <p className="text-sm font-semibold text-slate-300">
                   No messages in #{activeChannelMeta.label} yet
-                </p>
-                <p className="text-xs text-slate-500 max-w-sm">
-                  Start the conversation below! Every connected user in this channel will see your message in real time.
                 </p>
               </div>
             ) : (
@@ -519,18 +569,6 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                           <span className="text-xs font-mono text-sky-400">
                             @{msg.authorHandle}
                           </span>
-                          {msg.repoTag && (
-                            <button
-                              type="button"
-                              onClick={() => onAnalyzeRepoByName(msg.repoTag!)}
-                              className="px-2 py-0.5 text-[11px] font-mono text-emerald-300 bg-slate-900 border border-emerald-500/40 hover:border-emerald-400 rounded inline-flex items-center gap-1 transition-colors cursor-pointer"
-                              title={`Analyze ${msg.repoTag} in ContribLens`}
-                            >
-                              <Tag className="w-2.5 h-2.5" />
-                              <span>{msg.repoTag}</span>
-                              <ArrowRight className="w-2.5 h-2.5" />
-                            </button>
-                          )}
                         </div>
                       </div>
                       <span className="text-[11px] font-mono text-slate-500 shrink-0">
@@ -541,28 +579,6 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                     <p className="mt-2.5 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap break-words">
                       {msg.text}
                     </p>
-
-                    {/* Reactions Bar */}
-                    <div className="mt-3 flex items-center gap-2">
-                      {(['👍', '🚀', '💡'] as const).map((emoji) => {
-                        const count = msg.reactions?.[emoji] || 0;
-                        return (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => handleReaction(msg.id, emoji)}
-                            className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors inline-flex items-center gap-1 cursor-pointer ${
-                              count > 0
-                                ? 'bg-slate-900 border-sky-500/40 text-sky-300'
-                                : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700'
-                            }`}
-                          >
-                            <span>{emoji}</span>
-                            {count > 0 && <span>{count}</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
                   </div>
                 );
               })
@@ -573,21 +589,9 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
           {/* Message Composer */}
           <form
             onSubmit={handleSendMessage}
-            className="p-4 bg-slate-950 border-t border-slate-800 space-y-2.5"
+            className="p-4 bg-slate-950 border-t border-slate-800 space-y-2"
           >
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <label className="inline-flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={attachRepoTag}
-                  onChange={(e) => setAttachRepoTag(e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-900 text-sky-400 focus:ring-0"
-                />
-                <span>
-                  Tag current repository:{' '}
-                  <code className="font-mono text-emerald-400">{currentRepoFullName}</code>
-                </span>
-              </label>
+            <div className="flex items-center justify-end text-xs text-slate-400">
               <span className="font-mono text-[11px] text-slate-500">
                 Posting as @{effectiveHandle}
               </span>

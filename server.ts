@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import http from 'http';
+import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
@@ -2356,10 +2357,8 @@ interface DiscussionMessage {
   authorHandle: string;
   authorName: string;
   authorAvatar?: string;
-  repoTag?: string;
   text: string;
   createdAt: string;
-  reactions: Record<string, number>;
 }
 
 interface ConnectedDiscussionUser {
@@ -2369,9 +2368,12 @@ interface ConnectedDiscussionUser {
   avatarUrl?: string;
   activeChannel: string;
   joinedAt: string;
+  lastSeenMs?: number;
 }
 
-const discussionMessages: DiscussionMessage[] = [
+const DISCUSSION_STORE_PATH = path.join('/tmp', 'contriblens-discussion-store.json');
+
+const DEFAULT_DISCUSSION_MESSAGES: DiscussionMessage[] = [
   {
     id: 'welcome-general-1',
     channel: 'general',
@@ -2379,17 +2381,14 @@ const discussionMessages: DiscussionMessage[] = [
     authorName: 'ContribLens Community',
     text: 'Welcome to the live General Discussion! Connect with fellow open-source contributors, share repositories you are analyzing, or ask for feedback on an issue or pull request.',
     createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    reactions: { '🚀': 3, '👍': 2 },
   },
   {
     id: 'welcome-issues-1',
     channel: 'issue-hunting',
     authorHandle: 'contriblens-system',
     authorName: 'ContribLens Community',
-    repoTag: 'pallets/click',
     text: 'Use #issue-hunting to share good first issues, coordinate with other contributors so you do not duplicate PRs, or ask about reproducing a bug.',
     createdAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-    reactions: { '💡': 2 },
   },
   {
     id: 'welcome-prs-1',
@@ -2398,11 +2397,35 @@ const discussionMessages: DiscussionMessage[] = [
     authorName: 'ContribLens Community',
     text: 'Drop your Pull Request links or Git rebase questions in #pr-reviews to get peer code review before maintainer triage.',
     createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    reactions: { '👍': 1 },
   },
 ];
 
+function loadDiscussionMessages(): DiscussionMessage[] {
+  try {
+    if (fs.existsSync(DISCUSSION_STORE_PATH)) {
+      const raw = fs.readFileSync(DISCUSSION_STORE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {
+    // Ignore read error
+  }
+  return [...DEFAULT_DISCUSSION_MESSAGES];
+}
+
+function saveDiscussionMessages(msgs: DiscussionMessage[]) {
+  try {
+    fs.writeFileSync(DISCUSSION_STORE_PATH, JSON.stringify(msgs.slice(-300)), 'utf-8');
+  } catch {
+    // Ignore write error
+  }
+}
+
+const discussionMessages: DiscussionMessage[] = loadDiscussionMessages();
 const connectedUsers = new Map<string, ConnectedDiscussionUser>();
+const httpPresenceUsers = new Map<string, ConnectedDiscussionUser>();
 
 const httpServer = http.createServer(app);
 const io = new SocketIOServer(httpServer, {
@@ -2414,7 +2437,18 @@ const io = new SocketIOServer(httpServer, {
 });
 
 function getDeduplicatedOnlineUsers(): ConnectedDiscussionUser[] {
+  const now = Date.now();
+  // Prune stale HTTP heartbeat users (> 25 seconds old)
+  for (const [key, u] of httpPresenceUsers.entries()) {
+    if (now - (u.lastSeenMs || 0) > 25000) {
+      httpPresenceUsers.delete(key);
+    }
+  }
+
   const byHandle = new Map<string, ConnectedDiscussionUser>();
+  for (const u of httpPresenceUsers.values()) {
+    byHandle.set(u.handle.toLowerCase(), u);
+  }
   for (const u of connectedUsers.values()) {
     byHandle.set(u.handle.toLowerCase(), u);
   }
@@ -2429,6 +2463,7 @@ io.on('connection', (socket) => {
     name: defaultHandle,
     activeChannel: 'general',
     joinedAt: new Date().toISOString(),
+    lastSeenMs: Date.now(),
   });
 
   socket.join('general');
@@ -2462,6 +2497,7 @@ io.on('connection', (socket) => {
         avatarUrl: payload?.avatarUrl || current?.avatarUrl,
         activeChannel,
         joinedAt: current?.joinedAt || new Date().toISOString(),
+        lastSeenMs: Date.now(),
       });
 
       io.emit('presence:update', {
@@ -2476,6 +2512,7 @@ io.on('connection', (socket) => {
     const current = connectedUsers.get(socket.id);
     if (current) {
       current.activeChannel = channel;
+      current.lastSeenMs = Date.now();
       connectedUsers.set(socket.id, current);
       io.emit('presence:update', {
         onlineUsers: getDeduplicatedOnlineUsers(),
@@ -2491,7 +2528,6 @@ io.on('connection', (socket) => {
       authorHandle?: string;
       authorName?: string;
       authorAvatar?: string;
-      repoTag?: string;
       text?: string;
     }) => {
       const text = (payload?.text || '').trim();
@@ -2519,29 +2555,19 @@ io.on('connection', (socket) => {
         authorHandle,
         authorName,
         authorAvatar: payload?.authorAvatar || userEntry?.avatarUrl,
-        repoTag: payload?.repoTag ? payload.repoTag.trim() : undefined,
         text: text.slice(0, 2000),
         createdAt: new Date().toISOString(),
-        reactions: {},
       };
 
       discussionMessages.push(newMsg);
       if (discussionMessages.length > 300) {
         discussionMessages.shift();
       }
+      saveDiscussionMessages(discussionMessages);
 
       io.emit('message:created', newMsg);
     }
   );
-
-  socket.on('message:react', (payload: { messageId: string; emoji: string }) => {
-    const target = discussionMessages.find((m) => m.id === payload?.messageId);
-    const emoji = (payload?.emoji || '').trim();
-    if (!target || !emoji) return;
-
-    target.reactions[emoji] = (target.reactions[emoji] || 0) + 1;
-    io.emit('message:updated', target);
-  });
 
   socket.on('disconnect', () => {
     connectedUsers.delete(socket.id);
@@ -2552,7 +2578,32 @@ io.on('connection', (socket) => {
 });
 
 // HTTP REST Synchronization Endpoints (works alongside Socket.IO)
-app.get('/api/discussion/state', (_req: Request, res: Response) => {
+app.options('/api/discussion/*', (_req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(204).end();
+});
+
+app.get('/api/discussion/state', (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const qHandle = typeof req.query.handle === 'string' ? req.query.handle.trim().replace(/^@+/, '') : '';
+  const qName = typeof req.query.name === 'string' ? req.query.name.trim() : qHandle;
+  const qChannel = typeof req.query.channel === 'string' ? req.query.channel.trim() : 'general';
+  const qAvatar = typeof req.query.avatarUrl === 'string' && req.query.avatarUrl ? req.query.avatarUrl : undefined;
+
+  if (qHandle) {
+    httpPresenceUsers.set(qHandle.toLowerCase(), {
+      socketId: `http-${qHandle.toLowerCase()}`,
+      handle: qHandle.slice(0, 39),
+      name: (qName || qHandle).slice(0, 60),
+      avatarUrl: qAvatar,
+      activeChannel: qChannel || 'general',
+      joinedAt: new Date().toISOString(),
+      lastSeenMs: Date.now(),
+    });
+  }
+
   res.json({
     messages: discussionMessages.slice(-200),
     onlineUsers: getDeduplicatedOnlineUsers(),
@@ -2560,7 +2611,8 @@ app.get('/api/discussion/state', (_req: Request, res: Response) => {
 });
 
 app.post('/api/discussion/message', (req: Request, res: Response) => {
-  const { id, channel, authorHandle, authorName, authorAvatar, repoTag, text } = req.body || {};
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const { id, channel, authorHandle, authorName, authorAvatar, text } = req.body || {};
   const cleanText = (text || '').trim();
   if (!cleanText) {
     res.status(400).json({ error: 'Message text is required.' });
@@ -2581,16 +2633,15 @@ app.post('/api/discussion/message', (req: Request, res: Response) => {
     authorHandle: handle,
     authorName: (authorName || handle).trim().slice(0, 60),
     authorAvatar: authorAvatar || undefined,
-    repoTag: repoTag ? String(repoTag).trim() : undefined,
     text: cleanText.slice(0, 2000),
     createdAt: new Date().toISOString(),
-    reactions: {},
   };
 
   discussionMessages.push(newMsg);
   if (discussionMessages.length > 300) {
     discussionMessages.shift();
   }
+  saveDiscussionMessages(discussionMessages);
 
   io.emit('message:created', newMsg);
   res.json({ message: newMsg });

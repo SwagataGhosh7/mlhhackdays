@@ -5,6 +5,16 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  limit,
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCCycFIt39liiZyq2az8ixjM4l4t__Xhe4',
@@ -18,13 +28,13 @@ const firebaseConfig = {
 
 export const firebaseApp = initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(firebaseApp);
+export const firebaseDb = getFirestore(firebaseApp);
 
 export async function signInWithGitHubFirebasePopup(forceAccountLogin?: string): Promise<{
   accessToken: string;
   email?: string | null;
   displayName?: string | null;
 }> {
-  // Always sign out any cached Firebase user first so Firebase doesn't reuse a stale credential
   try {
     await signOut(firebaseAuth);
   } catch {
@@ -65,5 +75,65 @@ export async function signOutFirebase(): Promise<void> {
     await signOut(firebaseAuth);
   } catch {
     // Ignore sign-out errors if not signed in
+  }
+}
+
+export function subscribeToFirestoreDiscussion(
+  onMessages: (msgs: any[]) => void
+): () => void {
+  try {
+    const q = query(
+      collection(firebaseDb, 'discussion_messages'),
+      orderBy('createdAt', 'asc'),
+      limit(200)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data && data.id && data.text) {
+            list.push(data);
+          }
+        });
+        if (list.length > 0) {
+          onMessages(list);
+        }
+      },
+      () => {
+        // Ignore if Firestore rules or database are not enabled yet; Socket.IO + Express server handles sync
+      }
+    );
+    return unsub;
+  } catch {
+    return () => {};
+  }
+}
+
+export async function publishMessageToFirestore(message: {
+  id: string;
+  channel: string;
+  authorHandle: string;
+  authorName: string;
+  authorAvatar?: string;
+  text: string;
+  createdAt: string;
+}): Promise<void> {
+  try {
+    const cleanPayload: Record<string, any> = {
+      id: message.id,
+      channel: message.channel,
+      authorHandle: message.authorHandle,
+      authorName: message.authorName,
+      text: message.text,
+      createdAt: message.createdAt,
+    };
+    if (message.authorAvatar) {
+      cleanPayload.authorAvatar = message.authorAvatar;
+    }
+    await setDoc(doc(firebaseDb, 'discussion_messages', message.id), cleanPayload);
+  } catch {
+    // Ignore if Firestore is not enabled; Socket.IO + Express server handles sync
   }
 }

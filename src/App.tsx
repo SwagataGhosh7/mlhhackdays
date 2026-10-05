@@ -652,11 +652,7 @@ export default function App() {
 
         {activeTab === 'discussion' && (
           <GeneralDiscussionSection
-            currentRepoFullName={report.repo.fullName}
             authenticatedUser={authProfile?.user || null}
-            onAnalyzeRepoByName={(fullName) =>
-              handleAnalyzeRepo(fullName, skillLevel, 'All Areas')
-            }
           />
         )}
 
