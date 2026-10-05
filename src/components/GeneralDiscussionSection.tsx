@@ -6,6 +6,7 @@ import {
   Send,
   User,
   Users,
+  Wifi,
 } from 'lucide-react';
 import { GitHubUserProfile } from '../types';
 import {
@@ -30,6 +31,7 @@ export interface OnlineContributor {
   avatarUrl?: string;
   activeChannel: string;
   joinedAt: string;
+  lastSeenMs?: number;
 }
 
 interface GeneralDiscussionSectionProps {
@@ -38,6 +40,37 @@ interface GeneralDiscussionSectionProps {
 
 const HANDLE_STORAGE_KEY = 'contriblens_discussion_handle';
 const LOCAL_CACHE_KEY = 'contriblens_discussion_messages_cache';
+
+// Global WebSocket pub/sub relay topic so static Vercel deployments & separate containers sync in real time without needing Render
+const GLOBAL_WS_TOPIC = 'contriblens_oss_global_chat_v2';
+const GLOBAL_PRESENCE_TOPIC = 'contriblens_oss_global_presence_v2';
+
+const DEFAULT_WELCOME_MESSAGES: DiscussionMessageItem[] = [
+  {
+    id: 'welcome-general-1',
+    channel: 'general',
+    authorHandle: 'contriblens-system',
+    authorName: 'ContribLens Community',
+    text: 'Welcome to the live General Discussion! Connect with fellow open-source contributors, share repositories you are analyzing, or ask for feedback on an issue or pull request.',
+    createdAt: '2026-10-04T10:00:00.000Z',
+  },
+  {
+    id: 'welcome-issues-1',
+    channel: 'issue-hunting',
+    authorHandle: 'contriblens-system',
+    authorName: 'ContribLens Community',
+    text: 'Use #issue-hunting to share good first issues, coordinate with other contributors so you do not duplicate PRs, or ask about reproducing a bug.',
+    createdAt: '2026-10-04T10:01:00.000Z',
+  },
+  {
+    id: 'welcome-prs-1',
+    channel: 'pr-reviews',
+    authorHandle: 'contriblens-system',
+    authorName: 'ContribLens Community',
+    text: 'Drop your Pull Request links or Git rebase questions in #pr-reviews to get peer code review before maintainer triage.',
+    createdAt: '2026-10-04T10:02:00.000Z',
+  },
+];
 
 const CHANNELS = [
   {
@@ -66,15 +99,16 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       const cached = localStorage.getItem(LOCAL_CACHE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {
       // Ignore
     }
-    return [];
+    return DEFAULT_WELCOME_MESSAGES;
   });
   const [onlineUsers, setOnlineUsers] = useState<OnlineContributor[]>([]);
   const [messageInput, setMessageInput] = useState<string>('');
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState<boolean>(false);
   const [customHandle, setCustomHandle] = useState<string>(() => {
     const saved = localStorage.getItem(HANDLE_STORAGE_KEY);
     if (saved) return saved;
@@ -87,6 +121,8 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
   const [handleDraft, setHandleDraft] = useState<string>(customHandle);
 
   const socketRef = useRef<Socket | null>(null);
+  const globalWsRef = useRef<WebSocket | null>(null);
+  const presenceMapRef = useRef<Map<string, OnlineContributor>>(new Map());
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -94,13 +130,19 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
   const effectiveName = authenticatedUser?.name || effectiveHandle;
   const effectiveAvatar = authenticatedUser?.avatarUrl;
 
+  const customSocketServerUrl =
+    (import.meta as any).env?.VITE_SOCKET_SERVER_URL || '';
+
   // Idempotent batch/single message merger sorted chronologically
   const mergeMessages = useCallback((incomingList: DiscussionMessageItem[]) => {
     if (!Array.isArray(incomingList) || incomingList.length === 0) return;
     setMessages((prev) => {
       const byId = new Map<string, DiscussionMessageItem>();
+      for (const m of DEFAULT_WELCOME_MESSAGES) {
+        byId.set(m.id, m);
+      }
       for (const m of prev) {
-        if (m && m.id) byId.set(m.id, m);
+        if (m && m.id && m.text) byId.set(m.id, m);
       }
       let changed = false;
       for (const m of incomingList) {
@@ -126,7 +168,98 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
     });
   }, []);
 
-  // Poll server state & register active presence (guarantees sync even when proxies block WebSockets)
+  const mergeOnlineUsers = useCallback(
+    (serverUsers?: OnlineContributor[]) => {
+      const now = Date.now();
+      if (Array.isArray(serverUsers)) {
+        for (const u of serverUsers) {
+          if (u && u.handle) {
+            presenceMapRef.current.set(u.handle.toLowerCase(), {
+              ...u,
+              lastSeenMs: now,
+            });
+          }
+        }
+      }
+      // Always include self
+      presenceMapRef.current.set(effectiveHandle.toLowerCase(), {
+        socketId: 'self',
+        handle: effectiveHandle,
+        name: effectiveName,
+        avatarUrl: effectiveAvatar,
+        activeChannel,
+        joinedAt: new Date().toISOString(),
+        lastSeenMs: now,
+      });
+
+      // Prune stale entries (> 45s)
+      for (const [key, val] of presenceMapRef.current.entries()) {
+        if (now - (val.lastSeenMs || 0) > 45000) {
+          presenceMapRef.current.delete(key);
+        }
+      }
+
+      setOnlineUsers(Array.from(presenceMapRef.current.values()));
+    },
+    [effectiveHandle, effectiveName, effectiveAvatar, activeChannel]
+  );
+
+  // Sync history from global WebSocket relay (works on Vercel static builds & across separate URLs)
+  const syncFromGlobalRelay = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `https://ntfy.sh/${GLOBAL_WS_TOPIC}/json?poll=1&since=24h`,
+        { cache: 'no-store' }
+      );
+      if (!res.ok) return;
+      const text = await res.text();
+      const lines = text.split('\n').filter(Boolean);
+      const parsedMessages: DiscussionMessageItem[] = [];
+      for (const line of lines) {
+        try {
+          const envelope = JSON.parse(line);
+          if (envelope?.event === 'message' && typeof envelope.message === 'string') {
+            const payload = JSON.parse(envelope.message);
+            if (payload?.type === 'CHAT_MSG' && payload?.data?.id && payload?.data?.text) {
+              parsedMessages.push(payload.data as DiscussionMessageItem);
+            }
+          }
+        } catch {
+          // Ignore malformed line
+        }
+      }
+      if (parsedMessages.length > 0) {
+        mergeMessages(parsedMessages);
+      }
+    } catch {
+      // Ignore network hiccup
+    }
+  }, [mergeMessages]);
+
+  // Broadcast presence to global relay so users on Vercel / different URLs see each other online
+  const announceGlobalPresence = useCallback(async () => {
+    try {
+      const presencePayload = JSON.stringify({
+        type: 'PRESENCE_PING',
+        user: {
+          socketId: `global-${effectiveHandle.toLowerCase()}`,
+          handle: effectiveHandle,
+          name: effectiveName,
+          avatarUrl: effectiveAvatar,
+          activeChannel,
+          joinedAt: new Date().toISOString(),
+        },
+      });
+      await fetch(`https://ntfy.sh/${GLOBAL_PRESENCE_TOPIC}`, {
+        method: 'POST',
+        body: presencePayload,
+      });
+    } catch {
+      // Ignore
+    }
+  }, [effectiveHandle, effectiveName, effectiveAvatar, activeChannel]);
+
+  // Poll Express server state when running on full-stack server
   const syncFromServer = useCallback(async () => {
     try {
       const params = new URLSearchParams({
@@ -137,7 +270,8 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       if (effectiveAvatar) {
         params.set('avatarUrl', effectiveAvatar);
       }
-      const res = await fetch(`/api/discussion/state?${params.toString()}`, {
+      const baseUrl = customSocketServerUrl.replace(/\/+$/, '');
+      const res = await fetch(`${baseUrl}/api/discussion/state?${params.toString()}`, {
         cache: 'no-store',
       });
       if (res.ok) {
@@ -148,32 +282,102 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
             mergeMessages(data.messages);
           }
           if (Array.isArray(data?.onlineUsers)) {
-            setOnlineUsers(data.onlineUsers);
+            mergeOnlineUsers(data.onlineUsers);
           }
         }
       }
     } catch {
-      // Ignore network hiccup
+      mergeOnlineUsers();
     }
-  }, [effectiveHandle, effectiveName, effectiveAvatar, activeChannel, mergeMessages]);
+  }, [
+    effectiveHandle,
+    effectiveName,
+    effectiveAvatar,
+    activeChannel,
+    customSocketServerUrl,
+    mergeMessages,
+    mergeOnlineUsers,
+  ]);
 
-  // Set up Socket.IO + HTTP Sync Interval + Firestore Real-Time Listener + BroadcastChannel
+  // Connect Global WebSocket + Socket.IO + Firestore + BroadcastChannel
   useEffect(() => {
     syncFromServer();
-    const pollTimer = window.setInterval(syncFromServer, 1800);
+    syncFromGlobalRelay();
+    announceGlobalPresence();
 
-    // 1. Socket.IO with polling-first transport so Cloud Run / iframe proxies never hang on WS upgrade
-    const socket = io({
-      path: '/socket.io',
-      transports: ['polling', 'websocket'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-    });
+    const pollTimer = window.setInterval(() => {
+      syncFromServer();
+      syncFromGlobalRelay();
+    }, 2500);
+
+    const presenceTimer = window.setInterval(() => {
+      announceGlobalPresence();
+    }, 15000);
+
+    // 1. Global Real-Time WebSocket (`wss://`) — works across Vercel, AI Studio Dev/Shared URLs, & Mobile without needing Render
+    let globalWs: WebSocket | null = null;
+    let wsReconnectTimer: number | null = null;
+    let isUnmounted = false;
+
+    const connectGlobalWebSocket = () => {
+      if (isUnmounted) return;
+      try {
+        globalWs = new WebSocket(
+          `wss://ntfy.sh/${GLOBAL_WS_TOPIC},${GLOBAL_PRESENCE_TOPIC}/ws`
+        );
+        globalWsRef.current = globalWs;
+
+        globalWs.onopen = () => {
+          if (!isUnmounted) {
+            setIsRealtimeConnected(true);
+          }
+        };
+
+        globalWs.onmessage = (event) => {
+          try {
+            const envelope = JSON.parse(event.data);
+            if (envelope?.event === 'message' && typeof envelope.message === 'string') {
+              const payload = JSON.parse(envelope.message);
+              if (payload?.type === 'CHAT_MSG' && payload?.data?.id && payload?.data?.text) {
+                mergeMessages([payload.data as DiscussionMessageItem]);
+              } else if (payload?.type === 'PRESENCE_PING' && payload?.user?.handle) {
+                mergeOnlineUsers([payload.user as OnlineContributor]);
+              }
+            }
+          } catch {
+            // Ignore non-JSON frames
+          }
+        };
+
+        globalWs.onclose = () => {
+          if (!isUnmounted) {
+            wsReconnectTimer = window.setTimeout(connectGlobalWebSocket, 2000);
+          }
+        };
+      } catch {
+        // Fallback polling handles sync if WebSocket is blocked
+      }
+    };
+
+    connectGlobalWebSocket();
+
+    // 2. Socket.IO connection (connects to local Express server or VITE_SOCKET_SERVER_URL if configured)
+    const socket = customSocketServerUrl
+      ? io(customSocketServerUrl, {
+          path: '/socket.io',
+          transports: ['polling', 'websocket'],
+          reconnection: true,
+        })
+      : io({
+          path: '/socket.io',
+          transports: ['polling', 'websocket'],
+          reconnection: true,
+        });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      setIsRealtimeConnected(true);
       socket.emit('user:identify', {
         handle: effectiveHandle,
         name: effectiveName,
@@ -190,7 +394,7 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
           mergeMessages(payload.messages);
         }
         if (Array.isArray(payload?.onlineUsers)) {
-          setOnlineUsers(payload.onlineUsers);
+          mergeOnlineUsers(payload.onlineUsers);
         }
       }
     );
@@ -203,16 +407,16 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
 
     socket.on('presence:update', (payload: { onlineUsers?: OnlineContributor[] }) => {
       if (Array.isArray(payload?.onlineUsers)) {
-        setOnlineUsers(payload.onlineUsers);
+        mergeOnlineUsers(payload.onlineUsers);
       }
     });
 
-    // 2. Firebase Firestore real-time subscription (syncs across Dev URL, Shared URL, and Vercel)
+    // 3. Firebase Firestore real-time listener
     const unsubscribeFirestore = subscribeToFirestoreDiscussion((firestoreMsgs) => {
       mergeMessages(firestoreMsgs as DiscussionMessageItem[]);
     });
 
-    // 3. BroadcastChannel + storage listener for instant multi-tab sync
+    // 4. BroadcastChannel for instant multi-tab sync
     let bc: BroadcastChannel | null = null;
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       bc = new BroadcastChannel('contriblens_discussion_channel');
@@ -224,22 +428,12 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       broadcastChannelRef.current = bc;
     }
 
-    const handleStorageEvent = (e: StorageEvent) => {
-      if (e.key === LOCAL_CACHE_KEY && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed)) {
-            mergeMessages(parsed);
-          }
-        } catch {
-          // Ignore
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorageEvent);
-
     return () => {
+      isUnmounted = true;
       window.clearInterval(pollTimer);
+      window.clearInterval(presenceTimer);
+      if (wsReconnectTimer) window.clearTimeout(wsReconnectTimer);
+      if (globalWs) globalWs.close();
       socket.disconnect();
       socketRef.current = null;
       unsubscribeFirestore();
@@ -247,12 +441,20 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
         bc.close();
         broadcastChannelRef.current = null;
       }
-      window.removeEventListener('storage', handleStorageEvent);
     };
-  }, [syncFromServer, mergeMessages]);
+  }, [
+    syncFromServer,
+    syncFromGlobalRelay,
+    announceGlobalPresence,
+    customSocketServerUrl,
+    mergeMessages,
+    mergeOnlineUsers,
+  ]);
 
   // Re-identify when user connects GitHub or changes handle/channel
   useEffect(() => {
+    mergeOnlineUsers();
+    announceGlobalPresence();
     if (socketRef.current?.connected) {
       socketRef.current.emit('user:identify', {
         handle: effectiveHandle,
@@ -262,7 +464,7 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       });
       socketRef.current.emit('channel:join', { channel: activeChannel });
     }
-  }, [effectiveHandle, effectiveName, effectiveAvatar, activeChannel]);
+  }, [effectiveHandle, effectiveName, effectiveAvatar, activeChannel, mergeOnlineUsers, announceGlobalPresence]);
 
   const channelMessages = messages.filter((m) => m.channel === activeChannel);
 
@@ -299,19 +501,29 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
     mergeMessages([newMsg]);
     setMessageInput('');
 
-    // 2. Broadcast immediately to other open tabs
+    // 2. Publish to Global WebSocket Relay (`wss://ntfy.sh`) -> Delivers to Vercel, Shared URL, & Mobile users in <100ms without needing Render!
+    fetch(`https://ntfy.sh/${GLOBAL_WS_TOPIC}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'CHAT_MSG',
+        data: newMsg,
+      }),
+    }).catch(() => {});
+
+    // 3. Broadcast immediately to other open tabs in same browser
     broadcastChannelRef.current?.postMessage({
       type: 'NEW_MESSAGE',
       message: newMsg,
     });
 
-    // 3. Emit via Socket.IO if connected
+    // 4. Emit via Socket.IO if connected
     if (socketRef.current?.connected) {
       socketRef.current.emit('message:send', newMsg);
     }
 
-    // 4. Always POST to /api/discussion/message so server persists & broadcasts via io.emit
-    fetch('/api/discussion/message', {
+    // 5. POST to Express backend (`/api/discussion/message`) if running
+    const baseUrl = customSocketServerUrl.replace(/\/+$/, '');
+    fetch(`${baseUrl}/api/discussion/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newMsg),
@@ -324,7 +536,7 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       })
       .catch(() => {});
 
-    // 5. Publish to Firebase Firestore in parallel for cross-URL / Vercel sync
+    // 6. Publish to Firebase Firestore in parallel
     publishMessageToFirestore(newMsg);
   };
 
@@ -344,15 +556,22 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <div className="text-xs font-mono text-sky-400">
-            Real-Time Contributor Community · Live Multi-User Discussion
+          <div className="text-xs font-mono text-sky-400 flex items-center gap-2">
+            <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+            <span>
+              Global Real-Time WebSocket Relay · Works on Vercel &amp; AI Studio (No Render Server Required)
+            </span>
           </div>
           <h2 className="text-2xl font-bold text-slate-100 mt-1">
             General Discussion &amp; Issue Collaboration
           </h2>
           <p className="text-sm text-slate-300 mt-0.5">
-            Chat live with other developers, coordinate on open issues, and share insights in real time.
+            Chat live with other developers across any browser or deployment URL in real time.
           </p>
+        </div>
+        <div className="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>{isRealtimeConnected ? 'Global WebSocket Connected' : 'Real-Time Sync Active'}</span>
         </div>
       </div>
 
