@@ -557,7 +557,7 @@ export default function App() {
   ];
 
   return (
-    <div id="top" className="min-h-screen flex flex-col bg-[#F8FAF9] text-[#111827]">
+    <div id="top" className="min-h-screen flex flex-col bg-green-grid text-[#111827]">
       {/* Top Green Accent Line */}
       <div className="h-1 w-full bg-gradient-to-r from-[#14532D] via-[#15803D] to-[#22C55E]" />
 

@@ -73,7 +73,7 @@ export const RepoCommandBar: React.FC<RepoCommandBarProps> = ({
   };
 
   return (
-    <section className="border-b-2 border-[#15803D] bg-white">
+    <section className="border-b-2 border-[#15803D] bg-green-grid-surface">
       <div className="max-w-7xl mx-auto px-6 py-7">
         {/* Top Row: Title + Quick Description */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-5">

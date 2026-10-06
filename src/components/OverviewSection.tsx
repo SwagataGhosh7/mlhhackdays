@@ -73,7 +73,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
 
       {/* Top Spotlight: Best Contribution Recommendation */}
       {topRecommendation && (
-        <div className="border border-[#DDE5DF] border-t-4 border-t-[#15803D] bg-white rounded-xl p-6 shadow-xs">
+        <div className="border border-[#166534]/45 border-t-4 border-t-[#14532D] bg-white/95 rounded-xl p-6 shadow-xs">
           <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
             <div className="space-y-3 max-w-3xl">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono tabular-nums text-[#15803D]">
@@ -160,10 +160,10 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
           </span>
         </div>
 
-        <div className="border border-[#DDE5DF] border-t-2 border-t-[#15803D] bg-white rounded-xl divide-y divide-[#DDE5DF]">
+        <div className="border border-[#166534]/45 border-t-2 border-t-[#14532D] bg-white/95 rounded-xl divide-y divide-[#166534]/30">
           {/* Top Health Score Row */}
           <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-            <div className="lg:col-span-4 flex items-baseline gap-4 lg:border-r lg:border-[#DDE5DF] lg:pr-6">
+            <div className="lg:col-span-4 flex items-baseline gap-4 lg:border-r lg:border-[#166534]/30 lg:pr-6">
               <div className="text-5xl font-bold font-mono tabular-nums text-[#0B0F0D]">
                 {healthScore.overall}
                 <span className="text-xl text-[#64748B] font-normal">/100</span>
@@ -263,7 +263,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left 7 Cols: Architectural Analysis & Key Directories */}
-          <div className="lg:col-span-7 border border-[#DDE5DF] bg-white rounded-xl divide-y divide-[#DDE5DF]">
+          <div className="lg:col-span-7 border border-[#166534]/45 bg-white/95 rounded-xl divide-y divide-[#166534]/30">
             <div className="p-6 space-y-4">
               <div>
                 <h3 className="text-sm font-semibold text-[#0B0F0D] mb-1">
@@ -303,7 +303,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
           </div>
 
           {/* Right 5 Cols: Contributor Activity & Maintenance Risks */}
-          <div className="lg:col-span-5 border border-[#DDE5DF] bg-white rounded-xl divide-y divide-[#DDE5DF]">
+          <div className="lg:col-span-5 border border-[#166534]/45 bg-white/95 rounded-xl divide-y divide-[#166534]/30">
             <div className="p-6">
               <div className="flex items-baseline justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#0B0F0D]">
