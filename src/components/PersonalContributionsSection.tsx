@@ -108,26 +108,26 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
     <div className="space-y-10">
       {/* Top Bar when in BROWSE PROFILE mode */}
       {mode === 'browse' && (
-        <div className="border border-slate-800 bg-slate-900/50 rounded-xl p-6 space-y-4">
+        <div className="border border-[#DDE5DF] bg-white rounded-xl p-6 space-y-4">
           <div className="space-y-1">
-            <div className="text-xs font-mono text-sky-400">
-              Browse Any GitHub Profile · Powered by GitHub &amp; Gemma 4
+            <div className="text-xs font-mono text-[#15803D] font-semibold">
+              Browse Any GitHub Profile · ContribLens Developer Profile Analysis
             </div>
-            <h2 className="text-xl font-bold text-slate-100">
+            <h2 className="text-xl font-bold text-[#0B0F0D]">
               Paste a GitHub user URL to view their profile picture, listed repos, preferred languages, and improvements.
             </h2>
           </div>
 
           <form onSubmit={handleUserSearchSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-3">
             <div className="lg:col-span-9 relative flex items-center">
-              <UserSearch className="w-4 h-4 text-sky-400 absolute left-3.5 pointer-events-none" />
+              <UserSearch className="w-4 h-4 text-[#15803D] absolute left-3.5 pointer-events-none" />
               <input
                 type="text"
                 value={usernameQuery}
                 onChange={(e) => setUsernameQuery(e.target.value)}
                 placeholder="Paste GitHub user URL (e.g. https://github.com/torvalds, https://github.com/tiangolo, or @username)"
                 aria-label="Paste GitHub user profile URL"
-                className="w-full pl-10 pr-4 py-2.5 text-sm font-mono bg-slate-950 border border-slate-800 rounded-lg text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-400 transition-colors"
+                className="w-full pl-10 pr-4 py-2.5 text-sm font-mono bg-[#F8FAF9] border border-[#DDE5DF] rounded-lg text-[#0B0F0D] placeholder:text-[#64748B] focus:outline-none focus:border-[#15803D] transition-colors"
               />
             </div>
 
@@ -135,7 +135,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
               <button
                 type="submit"
                 disabled={isLoadingProfile}
-                className="w-full h-full px-4 py-2.5 text-sm font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 disabled:opacity-60 rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+                className="w-full h-full px-4 py-2.5 text-sm font-semibold text-white bg-[#15803D] hover:bg-[#166534] disabled:opacity-60 rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
               >
                 {isLoadingProfile ? (
                   <>
@@ -156,35 +156,35 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
 
       {/* Top Banner when in AUTHENTICATED MY GITHUB mode and not yet connected */}
       {mode === 'auth' && !isLoadingProfile && (!profile || !profile.authenticated) && (
-        <div className="border border-slate-800 bg-slate-900/50 rounded-xl p-8 max-w-4xl space-y-6">
+        <div className="border border-[#DDE5DF] bg-white rounded-xl p-8 max-w-4xl space-y-6">
           <div className="space-y-2">
-            <div className="text-xs font-mono text-emerald-400">
+            <div className="text-xs font-mono text-[#15803D] font-semibold">
               GitHub Authentication &amp; Personal Repository Analysis
             </div>
-            <h2 className="text-2xl font-bold text-slate-100 [text-wrap:balance]">
+            <h2 className="text-2xl font-bold text-[#0B0F0D] [text-wrap:balance]">
               Connect your GitHub account to analyze your private &amp; public repositories.
             </h2>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              Sign in via GitHub OAuth or paste a GitHub Personal Access Token (<code className="font-mono text-sky-300">ghp_...</code> / <code className="font-mono text-sky-300">github_pat_...</code>) to unlock your private repositories, run deep repository analysis on your own projects, and track your personal pull requests, issues, and commit velocity.
+            <p className="text-sm text-[#111827] leading-relaxed">
+              Sign in via GitHub OAuth or paste a GitHub Personal Access Token (<code className="font-mono text-[#15803D]">ghp_...</code> / <code className="font-mono text-[#15803D]">github_pat_...</code>) to unlock your private repositories, run deep repository analysis on your own projects, and track your personal pull requests, issues, and commit velocity.
             </p>
           </div>
 
           {authDiagnosticMessage && (
-            <div className="p-4 bg-amber-950/40 border border-amber-500/50 rounded-xl space-y-2.5 text-xs text-amber-100">
-              <div className="font-semibold text-amber-300">
+            <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl space-y-2.5 text-xs text-amber-950">
+              <div className="font-semibold text-amber-900">
                 Why Firebase returned &ldquo;CODE_EXCHANGE (auth/invalid-credential)&rdquo;:
               </div>
-              <p className="text-slate-200 leading-relaxed">
+              <p className="text-[#111827] leading-relaxed">
                 {authDiagnosticMessage}
               </p>
-              <ol className="list-decimal list-inside space-y-1 text-slate-300">
+              <ol className="list-decimal list-inside space-y-1 text-[#111827]">
                 <li>
                   Open{' '}
                   <a
                     href="https://github.com/settings/developers"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sky-400 underline"
+                    className="text-[#15803D] underline font-medium"
                   >
                     GitHub Settings → Developer settings → OAuth Apps
                   </a>{' '}
@@ -197,7 +197,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                     href="https://console.firebase.google.com/project/contriblens/authentication/providers"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sky-400 underline"
+                    className="text-[#15803D] underline font-medium"
                   >
                     Firebase Console → Authentication → Sign-in method → GitHub
                   </a>{' '}
@@ -209,7 +209,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                     href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=ContribLens"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-emerald-400 underline font-semibold"
+                    className="text-[#15803D] underline font-semibold"
                   >
                     github.com/settings/tokens/new
                   </a>{' '}
@@ -220,13 +220,13 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
           )}
 
           {/* Option 1: Direct GitHub Personal Access Token Connect (Bypasses CODE_EXCHANGE) */}
-          <div className="p-5 bg-slate-950/80 border border-emerald-500/40 rounded-xl space-y-3">
+          <div className="p-5 bg-[#F8FAF9] border border-[#15803D]/30 rounded-xl space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <div className="text-xs font-mono text-emerald-400">
+                <div className="text-xs font-mono text-[#15803D] font-semibold">
                   Instant Sign-In · Works on AI Studio &amp; Vercel without OAuth Callback Setup
                 </div>
-                <h3 className="text-sm font-semibold text-slate-100 mt-0.5">
+                <h3 className="text-sm font-semibold text-[#0B0F0D] mt-0.5">
                   Connect with GitHub Personal Access Token
                 </h3>
               </div>
@@ -234,7 +234,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                 href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=ContribLens"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs font-mono text-sky-400 hover:underline inline-flex items-center gap-1"
+                className="text-xs font-mono text-[#15803D] hover:underline inline-flex items-center gap-1"
               >
                 <span>Create GitHub Token (repo, read:user)</span>
                 <ExternalLink className="w-3 h-3" />
@@ -249,14 +249,14 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                   onChange={(e) => setPatInput(e.target.value)}
                   placeholder="Paste GitHub token (ghp_... or github_pat_...)"
                   aria-label="GitHub Personal Access Token"
-                  className="w-full px-3.5 py-2.5 text-sm font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-400 transition-colors"
+                  className="w-full px-3.5 py-2.5 text-sm font-mono bg-white border border-[#DDE5DF] rounded-lg text-[#0B0F0D] placeholder:text-[#64748B] focus:outline-none focus:border-[#15803D] transition-colors"
                 />
               </div>
               <div className="sm:col-span-4">
                 <button
                   type="submit"
                   disabled={isConnectingPat || !patInput.trim()}
-                  className="w-full h-full px-4 py-2.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-60 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full h-full px-4 py-2.5 text-xs font-semibold text-white bg-[#15803D] hover:bg-[#166534] disabled:opacity-60 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Github className="w-4 h-4" />
                   <span>{isConnectingPat ? 'Verifying Token...' : 'Connect with Token'}</span>
@@ -265,17 +265,17 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
             </form>
 
             {patError && (
-              <div className="text-xs text-rose-300 font-mono">{patError}</div>
+              <div className="text-xs text-red-700 font-mono">{patError}</div>
             )}
           </div>
 
           {/* Option 2: Firebase OAuth Popup */}
-          <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-slate-800/80">
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-[#DDE5DF]">
             <div className="space-y-0.5">
-              <div className="text-xs font-semibold text-slate-200">
+              <div className="text-xs font-semibold text-[#0B0F0D]">
                 Or Connect via Firebase GitHub OAuth Popup
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-[#64748B]">
                 Requires matching OAuth App Client ID &amp; Client Secret in Firebase Console.
               </div>
             </div>
@@ -283,7 +283,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
               type="button"
               disabled={isConnectingGitHub}
               onClick={onConnectGitHub}
-              className="px-4 py-2 text-xs font-semibold text-slate-100 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-60 rounded-lg transition-colors inline-flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-[#111827] bg-[#F8FAF9] hover:bg-[#F1F5F3] border border-[#DDE5DF] disabled:opacity-60 rounded-lg transition-colors inline-flex items-center gap-2 cursor-pointer"
             >
               <Github className="w-3.5 h-3.5" />
               <span>{isConnectingGitHub ? 'Connecting...' : 'Launch GitHub OAuth Popup'}</span>
@@ -291,27 +291,27 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
             </button>
           </div>
 
-          <div className="pt-4 border-t border-slate-800/80 space-y-3">
-            <div className="text-xs font-semibold text-slate-300">
+          <div className="pt-4 border-t border-[#DDE5DF] space-y-3">
+            <div className="text-xs font-semibold text-[#111827]">
               Firebase GitHub Auth Configuration (`contriblens.firebaseapp.com`)
             </div>
-            <div className="flex items-center justify-between gap-3 p-3 bg-slate-950 border border-slate-800 rounded-lg">
+            <div className="flex items-center justify-between gap-3 p-3 bg-[#F8FAF9] border border-[#DDE5DF] rounded-lg">
               <div className="truncate">
-                <span className="text-xs text-slate-400 mr-2">GitHub Callback URL:</span>
-                <code className="text-xs font-mono text-sky-400">{callbackUrl}</code>
+                <span className="text-xs text-[#64748B] mr-2">GitHub Callback URL:</span>
+                <code className="text-xs font-mono text-[#15803D]">{callbackUrl}</code>
               </div>
               <button
                 type="button"
                 onClick={handleCopyCallback}
-                className="px-2.5 py-1 text-xs font-mono text-slate-300 hover:text-slate-100 bg-slate-900 border border-slate-700 rounded flex items-center gap-1.5 shrink-0 cursor-pointer"
+                className="px-2.5 py-1 text-xs font-mono text-[#111827] hover:text-[#15803D] bg-white border border-[#DDE5DF] rounded flex items-center gap-1.5 shrink-0 cursor-pointer"
               >
                 <Copy className="w-3 h-3" />
                 <span>{copiedCallback ? 'Copied' : 'Copy URI'}</span>
               </button>
             </div>
-            <p className="text-xs text-slate-400">
-              Ensure <code className="text-slate-200 font-mono">{currentDomain}</code> is added under{' '}
-              <span className="text-slate-200 font-medium">
+            <p className="text-xs text-[#64748B]">
+              Ensure <code className="text-[#0B0F0D] font-mono">{currentDomain}</code> is added under{' '}
+              <span className="text-[#0B0F0D] font-medium">
                 Firebase Console → Authentication → Settings → Authorized domains
               </span>
               .
@@ -322,10 +322,10 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
 
       {/* Loading State */}
       {isLoadingProfile && (
-        <div className="border border-slate-800 bg-slate-900/40 rounded-xl p-12 text-center space-y-3">
-          <RefreshCw className="w-6 h-6 text-sky-400 animate-spin mx-auto" />
-          <p className="text-sm font-semibold text-slate-200">
-            Loading GitHub profile, listed repositories, preferred languages, and Gemma 4 developer analysis...
+        <div className="border border-[#DDE5DF] bg-white rounded-xl p-12 text-center space-y-3">
+          <RefreshCw className="w-6 h-6 text-[#15803D] animate-spin mx-auto" />
+          <p className="text-sm font-semibold text-[#0B0F0D]">
+            Loading GitHub profile, listed repositories, preferred languages, and developer analysis...
           </p>
         </div>
       )}
@@ -336,17 +336,17 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
           {/* 01. Developer Profile, Impact Score & Executive Summary */}
           <section className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-slate-100">
+              <h2 className="text-lg font-semibold text-[#0B0F0D]">
                 {mode === 'auth'
                   ? `01. Authenticated GitHub Account (@${profile.user.login}) & Analysis`
-                  : `01. Developer Profile on ContribLens & Gemma 4 Analysis`}
+                  : `01. Developer Profile on ContribLens & Analysis`}
               </h2>
               <div className="flex flex-wrap items-center gap-2.5">
                 <a
                   href={profile.user.htmlUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-1.5 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-[#15803D] hover:bg-[#166534] rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>View on GitHub</span>
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -358,7 +358,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                       ? onBrowseGitHubUser(profile.user.login)
                       : onRefreshProfile()
                   }
-                  className="px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-900 border border-slate-800 hover:border-slate-600 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-medium text-[#111827] bg-white border border-[#DDE5DF] hover:border-[#15803D] rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Refresh Telemetry</span>
@@ -367,7 +367,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                   <button
                     type="button"
                     onClick={onDisconnectGitHub}
-                    className="px-3 py-1.5 text-xs font-medium text-rose-300 bg-slate-900 border border-slate-800 hover:border-rose-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-[#DDE5DF] hover:border-red-600 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Disconnect GitHub</span>
@@ -376,7 +376,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
               </div>
             </div>
 
-            <div className="border border-slate-800 bg-slate-900/50 rounded-xl divide-y divide-slate-800">
+            <div className="border border-[#DDE5DF] bg-white rounded-xl divide-y divide-[#DDE5DF]">
               <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 <div className="lg:col-span-8 flex items-start gap-5">
                   {profile.user.avatarUrl && !avatarFailed ? (
@@ -385,33 +385,33 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                       alt={`${profile.user.login} GitHub avatar`}
                       referrerPolicy="no-referrer"
                       onError={() => setAvatarFailed(true)}
-                      className="w-20 h-20 rounded-full border-2 border-sky-400/60 object-cover shrink-0 shadow-lg"
+                      className="w-20 h-20 rounded-full border-2 border-[#15803D]/60 object-cover shrink-0 shadow-sm"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-full border-2 border-sky-400/60 bg-slate-800 flex items-center justify-center text-xl font-bold font-mono text-sky-400 shrink-0">
+                    <div className="w-20 h-20 rounded-full border-2 border-[#15803D]/60 bg-[#F1F5F3] flex items-center justify-center text-xl font-bold font-mono text-[#15803D] shrink-0">
                       {profile.user.login.slice(0, 2).toUpperCase()}
                     </div>
                   )}
 
                   <div className="space-y-2.5">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-xl font-bold text-slate-100">{profile.user.name}</h3>
-                      <span className="text-xs font-mono text-sky-400">
+                      <h3 className="text-xl font-bold text-[#0B0F0D]">{profile.user.name}</h3>
+                      <span className="text-xs font-mono text-[#15803D] font-semibold">
                         @{profile.user.login}
                       </span>
                       <a
                         href={profile.user.htmlUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-2.5 py-1 text-xs font-semibold text-sky-300 bg-slate-950 border border-sky-500/40 hover:border-sky-400 rounded-md inline-flex items-center gap-1.5 transition-colors"
+                        className="px-2.5 py-1 text-xs font-semibold text-[#15803D] bg-[#F8FAF9] border border-[#15803D]/30 hover:border-[#15803D] rounded-md inline-flex items-center gap-1.5 transition-colors"
                       >
                         <span>View on GitHub</span>
                         <ExternalLink className="w-3 h-3" />
                       </a>
                       {profile.developerAnalysis?.archetype && (
                         <>
-                          <span className="text-slate-600" aria-hidden="true">·</span>
-                          <span className="text-xs font-mono text-emerald-400">
+                          <span className="text-[#64748B]" aria-hidden="true">·</span>
+                          <span className="text-xs font-mono text-[#166534] font-semibold">
                             {profile.developerAnalysis.archetype}
                           </span>
                         </>
@@ -419,21 +419,21 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                     </div>
 
                     {profile.user.bio && (
-                      <p className="text-sm text-slate-300 max-w-2xl">{profile.user.bio}</p>
+                      <p className="text-sm text-[#111827] max-w-2xl">{profile.user.bio}</p>
                     )}
 
                     {profile.developerAnalysis?.executiveSummary && (
-                      <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+                      <p className="text-xs text-[#111827] leading-relaxed max-w-2xl">
                         {profile.developerAnalysis.executiveSummary}
                       </p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono tabular-nums text-slate-400 pt-1">
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono tabular-nums text-[#64748B] pt-1">
                       <span>{profile.user.publicRepos} public repos</span>
                       {profile.stats.privateReposCount > 0 && (
                         <>
                           <span aria-hidden="true">·</span>
-                          <span className="text-amber-400">
+                          <span className="text-amber-700 font-semibold">
                             {profile.stats.privateReposCount} private repos
                           </span>
                         </>
@@ -458,16 +458,16 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
 
                 {/* Developer Impact Score Panel */}
                 {profile.developerAnalysis && (
-                  <div className="lg:col-span-4 border border-slate-800 bg-slate-950/60 rounded-lg p-4 space-y-2">
+                  <div className="lg:col-span-4 border border-[#DDE5DF] bg-[#F8FAF9] rounded-lg p-4 space-y-2">
                     <div className="flex items-baseline justify-between">
-                      <span className="text-xs font-mono text-slate-400">
+                      <span className="text-xs font-mono text-[#64748B]">
                         Developer Impact Score
                       </span>
-                      <span className="text-2xl font-bold font-mono tabular-nums text-emerald-400">
+                      <span className="text-2xl font-bold font-mono tabular-nums text-[#15803D]">
                         {profile.developerAnalysis.impactScore}/100
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 leading-relaxed">
+                    <p className="text-xs text-[#111827] leading-relaxed">
                       {profile.developerAnalysis.contributionStyle}
                     </p>
                   </div>
@@ -475,34 +475,34 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
               </div>
 
               {/* Quantitative Contribution Metrics Strip */}
-              <div className="px-6 py-4 bg-slate-950/50 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="px-6 py-4 bg-[#F8FAF9] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                 <div>
-                  <div className="text-xs text-slate-400">Total Authored PRs</div>
-                  <div className="text-xl font-bold font-mono tabular-nums text-slate-100 mt-0.5">
+                  <div className="text-xs text-[#64748B]">Total Authored PRs</div>
+                  <div className="text-xl font-bold font-mono tabular-nums text-[#0B0F0D] mt-0.5">
                     {profile.stats.totalPrsAuthored.toLocaleString()}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400">Merged / Resolved PRs</div>
-                  <div className="text-xl font-bold font-mono tabular-nums text-emerald-400 mt-0.5">
+                  <div className="text-xs text-[#64748B]">Merged / Resolved PRs</div>
+                  <div className="text-xl font-bold font-mono tabular-nums text-[#15803D] mt-0.5">
                     {profile.stats.mergedPrsCount} sampled
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400">Issues Authored</div>
-                  <div className="text-xl font-bold font-mono tabular-nums text-sky-400 mt-0.5">
+                  <div className="text-xs text-[#64748B]">Issues Authored</div>
+                  <div className="text-xl font-bold font-mono tabular-nums text-[#0B0F0D] mt-0.5">
                     {profile.stats.totalIssuesAuthored.toLocaleString()}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400">Stars Across Sampled Repos</div>
-                  <div className="text-xl font-bold font-mono tabular-nums text-amber-400 mt-0.5">
+                  <div className="text-xs text-[#64748B]">Stars Across Sampled Repos</div>
+                  <div className="text-xl font-bold font-mono tabular-nums text-[#166534] mt-0.5">
                     {(profile.stats.totalStarsEarned ?? 0).toLocaleString()}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400">Preferred Languages</div>
-                  <div className="text-sm font-bold font-mono text-slate-100 mt-1 truncate">
+                  <div className="text-xs text-[#64748B]">Preferred Languages</div>
+                  <div className="text-sm font-bold font-mono text-[#0B0F0D] mt-1 truncate">
                     {profile.stats.topLanguages.slice(0, 3).join(' / ') || 'Multi-language'}
                   </div>
                 </div>
@@ -514,29 +514,29 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
           {profile.languageBreakdown && profile.languageBreakdown.length > 0 && (
             <section className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-100">
+                <h2 className="text-lg font-semibold text-[#0B0F0D]">
                   02. Preferred Languages &amp; Ecosystem Footprint
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-[#64748B] mt-0.5">
                   Language distribution calculated across @{profile.user.login}&apos;s active repositories and earned stars.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Language Bars */}
-                <div className="lg:col-span-7 border border-slate-800 bg-slate-900/40 rounded-xl p-6 space-y-4">
+                <div className="lg:col-span-7 border border-[#DDE5DF] bg-white rounded-xl p-6 space-y-4">
                   {profile.languageBreakdown.map((langItem) => (
                     <div key={langItem.language} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs font-mono tabular-nums">
-                        <span className="font-semibold text-slate-100">{langItem.language}</span>
-                        <span className="text-slate-400">
+                        <span className="font-semibold text-[#0B0F0D]">{langItem.language}</span>
+                        <span className="text-[#64748B]">
                           {langItem.percentage}% · {langItem.repoCount} repos ·{' '}
                           {langItem.totalStars.toLocaleString()} stars
                         </span>
                       </div>
-                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-[#F1F5F3] rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-sky-400 rounded-full"
+                          className="h-full bg-[#15803D] rounded-full"
                           style={{ width: `${Math.max(4, langItem.percentage)}%` }}
                         />
                       </div>
@@ -546,28 +546,28 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
 
                 {/* Strengths & Recommended Target Ecosystems */}
                 {profile.developerAnalysis && (
-                  <div className="lg:col-span-5 border border-slate-800 bg-slate-900/40 rounded-xl p-6 space-y-5">
+                  <div className="lg:col-span-5 border border-[#DDE5DF] bg-white rounded-xl p-6 space-y-5">
                     <div className="space-y-2.5">
-                      <h3 className="text-sm font-semibold text-slate-100">
+                      <h3 className="text-sm font-semibold text-[#0B0F0D]">
                         Key Engineering Strengths
                       </h3>
-                      <ul className="space-y-2 text-xs text-slate-300 leading-relaxed">
+                      <ul className="space-y-2 text-xs text-[#111827] leading-relaxed">
                         {profile.developerAnalysis.strengths.map((str, idx) => (
                           <li key={idx} className="flex items-start gap-2">
-                            <span className="font-mono text-emerald-400 shrink-0">0{idx + 1}.</span>
+                            <span className="font-mono text-[#15803D] font-semibold shrink-0">0{idx + 1}.</span>
                             <span>{str}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-800/80 space-y-2">
-                      <h4 className="text-xs font-mono text-sky-400">
+                    <div className="pt-4 border-t border-[#DDE5DF] space-y-2">
+                      <h4 className="text-xs font-mono text-[#15803D] font-semibold">
                         Recommended Next Contribution Ecosystems
                       </h4>
-                      <ul className="space-y-1.5 text-xs text-slate-300">
+                      <ul className="space-y-1.5 text-xs text-[#111827]">
                         {profile.developerAnalysis.recommendedNextRepoTypes.map((recType, i) => (
-                          <li key={i} className="font-mono text-slate-300">
+                          <li key={i} className="font-mono text-[#111827]">
                             · {recType}
                           </li>
                         ))}
@@ -584,10 +584,10 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
             profile.developerAnalysis.improvements.length > 0 && (
               <section className="space-y-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-100">
+                  <h2 className="text-lg font-semibold text-[#0B0F0D]">
                     03. Recommended Improvements &amp; Open-Source Growth Plan
                   </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-[#64748B] mt-0.5">
                     Concrete, metric-backed improvements to elevate @{profile.user.login}&apos;s GitHub portfolio and contribution impact.
                   </p>
                 </div>
@@ -596,41 +596,41 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                   {profile.developerAnalysis.improvements.map((imp) => (
                     <div
                       key={imp.id}
-                      className="border border-slate-800 bg-slate-900/50 rounded-xl p-5 flex flex-col justify-between space-y-4"
+                      className="border border-[#DDE5DF] bg-white rounded-xl p-5 flex flex-col justify-between space-y-4"
                     >
                       <div className="space-y-2.5">
                         <div className="flex flex-wrap items-center gap-x-2 text-xs font-mono">
                           <span
                             className={
                               imp.priority === 'High Impact'
-                                ? 'text-amber-400 font-semibold'
+                                ? 'text-amber-700 font-semibold'
                                 : imp.priority === 'Quick Win'
-                                ? 'text-emerald-400 font-semibold'
-                                : 'text-sky-400 font-semibold'
+                                ? 'text-[#15803D] font-semibold'
+                                : 'text-[#166534] font-semibold'
                             }
                           >
                             {imp.priority}
                           </span>
-                          <span className="text-slate-600" aria-hidden="true">·</span>
-                          <span className="text-slate-400">{imp.category}</span>
+                          <span className="text-[#64748B]" aria-hidden="true">·</span>
+                          <span className="text-[#64748B]">{imp.category}</span>
                         </div>
 
-                        <h3 className="text-base font-bold text-slate-100">{imp.title}</h3>
+                        <h3 className="text-base font-bold text-[#0B0F0D]">{imp.title}</h3>
 
-                        <div className="text-xs font-mono text-slate-400">
+                        <div className="text-xs font-mono text-[#64748B]">
                           Evidence: {imp.metricEvidence}
                         </div>
 
-                        <p className="text-xs text-slate-300 leading-relaxed">
+                        <p className="text-xs text-[#111827] leading-relaxed">
                           {imp.currentObservation}
                         </p>
                       </div>
 
-                      <div className="pt-3 border-t border-slate-800/80 space-y-1">
-                        <div className="text-xs font-mono text-sky-400">
+                      <div className="pt-3 border-t border-[#DDE5DF] space-y-1">
+                        <div className="text-xs font-mono text-[#15803D] font-semibold">
                           Actionable Improvement Step:
                         </div>
-                        <p className="text-xs text-slate-200 leading-relaxed">
+                        <p className="text-xs text-[#0B0F0D] leading-relaxed">
                           {imp.actionableSteps}
                         </p>
                       </div>
@@ -644,28 +644,28 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
           <section className="space-y-4">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-100">
+                <h2 className="text-lg font-semibold text-[#0B0F0D]">
                   04. Listed Repositories for @{profile.user.login} ({profile.accessibleRepos.length})
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-[#64748B] mt-0.5">
                   Click &ldquo;Analyze Repo&rdquo; to inspect its health score and contribution plan on ContribLens, or &ldquo;View on GitHub&rdquo;.
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative flex items-center">
-                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
+                  <Search className="w-3.5 h-3.5 text-[#64748B] absolute left-3 pointer-events-none" />
                   <input
                     type="text"
                     value={repoSearch}
                     onChange={(e) => setRepoSearch(e.target.value)}
                     placeholder="Filter repositories..."
                     aria-label="Filter repositories"
-                    className="pl-8 pr-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded-lg text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-sky-400"
+                    className="pl-8 pr-3 py-1.5 text-xs bg-white border border-[#DDE5DF] rounded-lg text-[#111827] placeholder:text-[#64748B] focus:outline-none focus:border-[#15803D]"
                   />
                 </div>
 
-                <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg">
+                <div className="flex items-center gap-1 p-1 bg-[#F1F5F3] border border-[#DDE5DF] rounded-lg">
                   {(
                     [
                       { id: 'all', label: `All (${profile.accessibleRepos.length})` },
@@ -679,8 +679,8 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                       onClick={() => setRepoVisibilityFilter(tab.id)}
                       className={`px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                         repoVisibilityFilter === tab.id
-                          ? 'bg-sky-400 text-slate-950 font-semibold'
-                          : 'text-slate-400 hover:text-slate-100'
+                          ? 'bg-[#15803D] text-white font-semibold'
+                          : 'text-[#64748B] hover:text-[#111827]'
                       }`}
                     >
                       {tab.label}
@@ -690,11 +690,11 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
               </div>
             </div>
 
-            <div className="border border-slate-800 bg-slate-900/40 rounded-xl overflow-hidden">
+            <div className="border border-[#DDE5DF] bg-white rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-800 bg-slate-950/60 text-xs font-mono text-slate-400">
+                    <tr className="border-b border-[#DDE5DF] bg-[#F8FAF9] text-xs font-mono text-[#64748B]">
                       <th className="py-3 px-4">Repository</th>
                       <th className="py-3 px-4 w-28">Visibility</th>
                       <th className="py-3 px-4 w-32">Language</th>
@@ -704,7 +704,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                       <th className="py-3 px-4 w-64 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/80 text-xs">
+                  <tbody className="divide-y divide-[#DDE5DF] text-xs">
                     {profile.accessibleRepos
                       .filter((r) => {
                         const matchesVis =
@@ -722,38 +722,38 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                       .map((repoItem) => (
                         <tr
                           key={repoItem.fullName}
-                          className="hover:bg-slate-800/30 transition-colors"
+                          className="hover:bg-[#F8FAF9] transition-colors"
                         >
                           <td className="py-3 px-4 align-top space-y-0.5">
-                            <div className="font-mono font-semibold text-slate-100 text-sm">
+                            <div className="font-mono font-semibold text-[#0B0F0D] text-sm">
                               {repoItem.fullName}
                             </div>
                             {repoItem.description && (
-                              <div className="text-xs text-slate-400 line-clamp-1">
+                              <div className="text-xs text-[#64748B] line-clamp-1">
                                 {repoItem.description}
                               </div>
                             )}
                           </td>
                           <td className="py-3 px-4 font-mono align-top">
                             {repoItem.isPrivate ? (
-                              <span className="text-amber-400 inline-flex items-center gap-1">
+                              <span className="text-amber-700 font-semibold inline-flex items-center gap-1">
                                 <Lock className="w-3 h-3" />
                                 <span>Private</span>
                               </span>
                             ) : (
-                              <span className="text-slate-400">Public</span>
+                              <span className="text-[#64748B]">Public</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 font-mono text-slate-300 align-top">
+                          <td className="py-3 px-4 font-mono text-[#111827] align-top">
                             {repoItem.language}
                           </td>
-                          <td className="py-3 px-4 font-mono tabular-nums text-right text-slate-300 align-top">
+                          <td className="py-3 px-4 font-mono tabular-nums text-right text-[#111827] align-top">
                             {repoItem.stars.toLocaleString()}
                           </td>
-                          <td className="py-3 px-4 font-mono tabular-nums text-right text-slate-300 align-top">
+                          <td className="py-3 px-4 font-mono tabular-nums text-right text-[#111827] align-top">
                             {repoItem.openIssuesCount.toLocaleString()}
                           </td>
-                          <td className="py-3 px-4 font-mono tabular-nums text-right text-slate-400 align-top">
+                          <td className="py-3 px-4 font-mono tabular-nums text-right text-[#64748B] align-top">
                             {formatDate(repoItem.pushedAt)}
                           </td>
                           <td className="py-3 px-4 text-right align-top">
@@ -762,7 +762,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                                 href={repoItem.htmlUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-sky-400 bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-md inline-flex items-center gap-1 whitespace-nowrap"
+                                className="px-2.5 py-1.5 text-xs font-medium text-[#111827] hover:text-[#15803D] bg-[#F8FAF9] border border-[#DDE5DF] hover:border-[#15803D] rounded-md inline-flex items-center gap-1 whitespace-nowrap"
                                 title="View repository on GitHub"
                               >
                                 <span>View on GitHub</span>
@@ -772,7 +772,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                                 type="button"
                                 disabled={isAnalyzingRepo}
                                 onClick={() => onAnalyzeRepoByName(repoItem.fullName)}
-                                className="px-3 py-1.5 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 disabled:opacity-60 rounded-md transition-colors inline-flex items-center gap-1 whitespace-nowrap cursor-pointer"
+                                className="px-3 py-1.5 text-xs font-semibold text-white bg-[#15803D] hover:bg-[#166534] disabled:opacity-60 rounded-md transition-colors inline-flex items-center gap-1 whitespace-nowrap cursor-pointer"
                               >
                                 <span>Analyze Repo</span>
                                 <ArrowRight className="w-3 h-3" />
@@ -791,15 +791,15 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
           <section className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-100">
+                <h2 className="text-lg font-semibold text-[#0B0F0D]">
                   05. @{profile.user.login}&apos;s Contribution History
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-[#64748B] mt-0.5">
                   Recent pull requests, reported issues, and pushed commits across GitHub.
                 </p>
               </div>
 
-              <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg self-start">
+              <div className="flex items-center gap-1 p-1 bg-[#F1F5F3] border border-[#DDE5DF] rounded-lg self-start">
                 {(
                   [
                     {
@@ -819,8 +819,8 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                     onClick={() => setHistoryTab(tab.id)}
                     className={`px-3 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                       historyTab === tab.id
-                        ? 'bg-sky-400 text-slate-950 font-semibold'
-                        : 'text-slate-400 hover:text-slate-100'
+                        ? 'bg-[#15803D] text-white font-semibold'
+                        : 'text-[#64748B] hover:text-[#111827]'
                     }`}
                   >
                     {tab.label}
@@ -829,11 +829,11 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
               </div>
             </div>
 
-            <div className="border border-slate-800 bg-slate-900/40 rounded-xl overflow-hidden">
+            <div className="border border-[#DDE5DF] bg-white rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-800 bg-slate-950/60 text-xs font-mono text-slate-400">
+                    <tr className="border-b border-[#DDE5DF] bg-[#F8FAF9] text-xs font-mono text-[#64748B]">
                       <th className="py-3 px-4 w-28">Ref</th>
                       <th className="py-3 px-4 w-52">Repository</th>
                       <th className="py-3 px-4">Contribution Title / Message</th>
@@ -842,7 +842,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                       <th className="py-3 px-4 w-48 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/80 text-xs">
+                  <tbody className="divide-y divide-[#DDE5DF] text-xs">
                     {(historyTab === 'prs'
                       ? profile.recentPullRequests
                       : historyTab === 'issues'
@@ -851,31 +851,31 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                     ).map((item) => (
                       <tr
                         key={`${item.type}-${item.id}`}
-                        className="hover:bg-slate-800/30 transition-colors"
+                        className="hover:bg-[#F8FAF9] transition-colors"
                       >
-                        <td className="py-3 px-4 font-mono tabular-nums text-sky-400 align-top">
+                        <td className="py-3 px-4 font-mono tabular-nums text-[#15803D] font-semibold align-top">
                           {item.number ? `#${item.number}` : item.sha || item.type.toUpperCase()}
                         </td>
-                        <td className="py-3 px-4 font-mono text-slate-300 align-top truncate max-w-[200px]">
+                        <td className="py-3 px-4 font-mono text-[#111827] align-top truncate max-w-[200px]">
                           {item.repoFullName}
                         </td>
-                        <td className="py-3 px-4 text-slate-100 font-medium align-top">
+                        <td className="py-3 px-4 text-[#0B0F0D] font-medium align-top">
                           {item.title}
                         </td>
                         <td className="py-3 px-4 font-mono align-top">
                           <span
                             className={
                               item.state === 'merged' || item.state === 'committed'
-                                ? 'text-emerald-400'
+                                ? 'text-[#15803D] font-semibold'
                                 : item.state === 'open'
-                                ? 'text-sky-400'
-                                : 'text-slate-400'
+                                ? 'text-[#166534]'
+                                : 'text-[#64748B]'
                             }
                           >
                             {item.state}
                           </span>
                         </td>
-                        <td className="py-3 px-4 font-mono tabular-nums text-right text-slate-400 align-top">
+                        <td className="py-3 px-4 font-mono tabular-nums text-right text-[#64748B] align-top">
                           {formatDate(item.updatedAt || item.createdAt)}
                         </td>
                         <td className="py-3 px-4 text-right align-top">
@@ -884,7 +884,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                               type="button"
                               disabled={isAnalyzingRepo}
                               onClick={() => onAnalyzeRepoByName(item.repoFullName)}
-                              className="text-xs font-medium text-sky-400 hover:underline whitespace-nowrap cursor-pointer"
+                              className="text-xs font-semibold text-[#15803D] hover:underline whitespace-nowrap cursor-pointer"
                             >
                               Analyze Repo
                             </button>
@@ -892,7 +892,7 @@ export const PersonalContributionsSection: React.FC<PersonalContributionsSection
                               href={item.htmlUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-2 py-1 text-xs text-slate-300 hover:text-sky-400 bg-slate-950 border border-slate-800 rounded inline-flex items-center gap-1"
+                              className="px-2 py-1 text-xs text-[#111827] hover:text-[#15803D] bg-[#F8FAF9] border border-[#DDE5DF] rounded inline-flex items-center gap-1"
                               title="View on GitHub"
                             >
                               <span>View on GitHub</span>

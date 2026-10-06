@@ -103,11 +103,80 @@ const FALLBACK_MODELS = [
   'gemini-3.1-flash-lite-preview',
 ];
 
+const GEMMA_TIMEOUT_MS = 45_000; // 45-second circuit-breaker timeout for Gemma 4 (Ollama / FastAPI / Vertex AI)
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function tryGemma4EndpointWith45sTimeout(
+  contents: string,
+  systemInstruction?: string,
+  expectJson = false
+): Promise<string | null> {
+  const endpointUrl =
+    process.env.FASTAPI_GEMMA_URL ||
+    process.env.VERTEX_GEMMA_ENDPOINT ||
+    process.env.OLLAMA_BASE_URL ||
+    '';
+  if (!endpointUrl.trim()) {
+    return null;
+  }
+
+  const gemmaModel = process.env.GEMMA_MODEL_NAME || 'gemma4:latest';
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GEMMA_TIMEOUT_MS);
+
+  try {
+    const cleanUrl = endpointUrl.trim().replace(/\/+$/, '');
+    const targetUrl = cleanUrl.endsWith('/api/generate') || cleanUrl.endsWith('/v1/chat/completions')
+      ? cleanUrl
+      : `${cleanUrl}/api/generate`;
+
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: gemmaModel,
+        prompt: systemInstruction ? `${systemInstruction}\n\n${contents}` : contents,
+        stream: false,
+        ...(expectJson ? { format: 'json' } : {}),
+      }),
+    });
+
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const reply =
+      data?.response ||
+      data?.choices?.[0]?.message?.content ||
+      data?.output ||
+      '';
+    return typeof reply === 'string' && reply.trim() ? reply.trim() : null;
+  } catch {
+    // If local Ollama / FastAPI / Vertex Gemma 4 times out (>45s) or is unreachable, silently reroute to Gemini API
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function generateJsonWithFallback(contents: string, config: any): Promise<any> {
+  // Tier 1: Attempt Gemma 4 (Ollama / FastAPI / Vertex AI) with strict 45s circuit-breaker timeout
+  const gemmaRaw = await tryGemma4EndpointWith45sTimeout(
+    contents,
+    config?.systemInstruction,
+    true
+  );
+  if (gemmaRaw) {
+    try {
+      return JSON.parse(gemmaRaw);
+    } catch {
+      // Malformed JSON from Gemma 4 -> reroute to Gemini API
+    }
+  }
+
+  // Tier 2: Automatic fallback to default GEMINI_API_KEY multi-model chain
   const clients = getGenAICandidates();
   let lastError: any = null;
 
@@ -2147,6 +2216,13 @@ Requirements:
 });
 
 async function generateTextWithFallback(contents: string, systemInstruction: string): Promise<string> {
+  // Tier 1: Attempt Gemma 4 (Ollama / FastAPI / Vertex AI) with strict 45s circuit-breaker timeout
+  const gemmaReply = await tryGemma4EndpointWith45sTimeout(contents, systemInstruction, false);
+  if (gemmaReply) {
+    return gemmaReply;
+  }
+
+  // Tier 2: Automatic fallback to default GEMINI_API_KEY multi-model chain
   const clients = getGenAICandidates();
   let lastError: any = null;
 

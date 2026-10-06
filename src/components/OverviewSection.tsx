@@ -31,88 +31,92 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   ];
 
   const getStatusTextColor = (status: string) => {
-    if (status === 'Nominal') return 'text-emerald-400';
-    if (status === 'Warning') return 'text-amber-400';
-    return 'text-rose-400';
+    if (status === 'Nominal') return 'text-[#15803D] font-semibold';
+    if (status === 'Warning') return 'text-amber-700 font-semibold';
+    return 'text-red-700 font-semibold';
   };
 
   const getBarColor = (status: string) => {
-    if (status === 'Nominal') return 'bg-emerald-400';
-    if (status === 'Warning') return 'bg-amber-400';
-    return 'bg-rose-400';
+    if (status === 'Nominal') return 'bg-[#15803D]';
+    if (status === 'Warning') return 'bg-amber-600';
+    return 'bg-red-600';
   };
 
   return (
     <div className="space-y-10">
       {/* Linked User's Specific Contribution Footprint in This Repository */}
       {userRepoHistory && (
-        <div className="border border-emerald-500/40 bg-slate-900/70 rounded-xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="border border-[#15803D]/30 bg-white rounded-xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono tabular-nums text-emerald-400">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono tabular-nums text-[#15803D]">
               <span className="font-semibold">Your Contribution Footprint in {report.repo.fullName}</span>
               <span aria-hidden="true">·</span>
-              <span className="text-slate-200">@{userRepoHistory.username}</span>
+              <span className="text-[#0B0F0D] font-semibold">@{userRepoHistory.username}</span>
               <span aria-hidden="true">·</span>
-              <span className="text-slate-300">{userRepoHistory.commitsInRepo} commits ({userRepoHistory.contributorSharePercent}% share)</span>
+              <span className="text-[#111827]">{userRepoHistory.commitsInRepo} commits ({userRepoHistory.contributorSharePercent}% share)</span>
               <span aria-hidden="true">·</span>
-              <span className="text-slate-300">{userRepoHistory.prsInRepo.length} sampled PRs</span>
+              <span className="text-[#111827]">{userRepoHistory.prsInRepo.length} sampled PRs</span>
               <span aria-hidden="true">·</span>
-              <span className="text-slate-300">{userRepoHistory.issuesInRepo.length} open issues</span>
+              <span className="text-[#111827]">{userRepoHistory.issuesInRepo.length} open issues</span>
             </div>
-            <p className="text-xs text-slate-300">{userRepoHistory.personalizedSummary}</p>
+            <p className="text-xs text-[#64748B]">{userRepoHistory.personalizedSummary}</p>
           </div>
           <button
             type="button"
             onClick={() => onNavigateTab('profile')}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-200 bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="px-3.5 py-2 text-xs font-semibold text-[#111827] bg-[#F8FAF9] border border-[#DDE5DF] hover:border-[#15803D] hover:text-[#15803D] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             View My Full Contribution History →
           </button>
         </div>
       )}
 
-      {/* Top Spotlight: Best Contribution Match for Target Skill Level */}
+      {/* Top Spotlight: Best Contribution Recommendation */}
       {topRecommendation && (
-        <div className="border border-sky-500/40 bg-slate-900/80 rounded-xl p-6">
+        <div className="border border-[#DDE5DF] border-t-4 border-t-[#15803D] bg-white rounded-xl p-6 shadow-xs">
           <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
             <div className="space-y-3 max-w-3xl">
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono tabular-nums text-sky-400">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono tabular-nums text-[#15803D]">
                 <span className="font-semibold">Best Contribution Recommendation</span>
                 <span aria-hidden="true">·</span>
                 <span>Issue #{topRecommendation.issueNumber}</span>
                 <span aria-hidden="true">·</span>
-                <span className="text-slate-300">Difficulty: {topRecommendation.difficulty}</span>
+                <span className="text-[#111827]">Difficulty: {topRecommendation.difficulty}</span>
                 <span aria-hidden="true">·</span>
-                <span className="text-slate-300">Estimated effort: {topRecommendation.estimatedEffort}</span>
+                <span className="text-[#111827]">Estimated effort: {topRecommendation.estimatedEffort}</span>
                 <span aria-hidden="true">·</span>
-                <span className="text-emerald-400">
+                <span className="text-[#166534] font-semibold">
                   {topRecommendation.impactLevel} ({topRecommendation.impactScore}/100)
                 </span>
               </div>
 
-              <h3 className="text-xl font-bold text-slate-100 [text-wrap:balance]">
+              <h3 className="text-xl font-bold text-[#0B0F0D] [text-wrap:balance]">
                 Issue #{topRecommendation.issueNumber} — {topRecommendation.title}
               </h3>
 
-              <div className="text-xs font-mono text-slate-400">
-                <span className="text-slate-300 font-semibold">Skills: </span>
+              <p className="text-xs text-[#64748B]">
+                This issue closely matches your current skills and provides a realistic starting point for your first contribution.
+              </p>
+
+              <div className="text-xs font-mono text-[#64748B]">
+                <span className="text-[#111827] font-semibold">Skills: </span>
                 {topRecommendation.skills.join(' · ')}
               </div>
 
-              <div className="pt-1 space-y-1.5 text-sm text-slate-300">
+              <div className="pt-1 space-y-1.5 text-sm text-[#111827]">
                 <p>
-                  <span className="font-semibold text-slate-100">Why this issue? </span>
+                  <span className="font-semibold text-[#0B0F0D]">Why this issue? </span>
                   {topRecommendation.whyThisIssue}
                 </p>
-                <p className="text-slate-400">
-                  <span className="font-semibold text-slate-200">AI Explanation: </span>
+                <p className="text-[#64748B]">
+                  <span className="font-semibold text-[#111827]">Issue Summary: </span>
                   {topRecommendation.plainExplanation.summary}
                 </p>
               </div>
 
               {topRecommendation.likelyFiles.length > 0 && (
-                <div className="pt-1 text-xs font-mono text-slate-400">
-                  <span className="text-slate-300">Target files: </span>
+                <div className="pt-1 text-xs font-mono text-[#15803D]">
+                  <span className="text-[#111827] font-semibold">Target files: </span>
                   {topRecommendation.likelyFiles.join(' · ')}
                 </div>
               )}
@@ -123,7 +127,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
                 type="button"
                 disabled={isGeneratingPlan}
                 onClick={() => onSelectIssueForPlan(topRecommendation)}
-                className="px-4 py-2.5 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 disabled:opacity-60 rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+                className="px-4 py-2.5 text-xs font-semibold text-white bg-[#15803D] hover:bg-[#166534] disabled:opacity-60 rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
               >
                 <span>
                   {isGeneratingPlan ? 'Generating Plan...' : 'Generate Contribution Plan'}
@@ -133,7 +137,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateTab('recommendations')}
-                className="px-4 py-2 text-xs font-semibold text-slate-200 bg-slate-950 border border-slate-700 hover:border-slate-500 rounded-lg transition-colors whitespace-nowrap cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold text-[#111827] bg-[#F8FAF9] border border-[#DDE5DF] hover:border-[#15803D] hover:text-[#15803D] rounded-lg transition-colors whitespace-nowrap cursor-pointer"
               >
                 View All {recommendedIssues.length} Matched Issues
               </button>
@@ -142,35 +146,38 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
         </div>
       )}
 
-      {/* Section 01: Project Health Score & Activity Telemetry */}
+      {/* Section 01: Project Health & Maintenance */}
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-100">
-            01. Project Health Score &amp; Maintenance Telemetry
-          </h2>
-          <span className="text-xs font-mono tabular-nums text-slate-400">
+          <div className="flex items-center gap-2.5">
+            <span className="w-1 h-5 bg-[#15803D] rounded-full shrink-0" />
+            <h2 className="text-lg font-semibold text-[#0B0F0D]">
+              Project Health &amp; Maintenance
+            </h2>
+          </div>
+          <span className="text-xs font-mono tabular-nums text-[#64748B]">
             Target Profile: {report.targetSkillLevel} Contributor
           </span>
         </div>
 
-        <div className="border border-slate-800 bg-slate-900/50 rounded-xl divide-y divide-slate-800">
+        <div className="border border-[#DDE5DF] border-t-2 border-t-[#15803D] bg-white rounded-xl divide-y divide-[#DDE5DF]">
           {/* Top Health Score Row */}
           <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-            <div className="lg:col-span-4 flex items-baseline gap-4 lg:border-r lg:border-slate-800 lg:pr-6">
-              <div className="text-5xl font-bold font-mono tabular-nums text-slate-100">
+            <div className="lg:col-span-4 flex items-baseline gap-4 lg:border-r lg:border-[#DDE5DF] lg:pr-6">
+              <div className="text-5xl font-bold font-mono tabular-nums text-[#0B0F0D]">
                 {healthScore.overall}
-                <span className="text-xl text-slate-500 font-normal">/100</span>
+                <span className="text-xl text-[#64748B] font-normal">/100</span>
               </div>
               <div>
-                <div className="text-xs font-mono text-slate-400">Project Health Status</div>
-                <div className="text-sm font-semibold text-emerald-400 mt-0.5">
+                <div className="text-xs font-mono text-[#64748B]">Project Health Status</div>
+                <div className="text-sm font-semibold text-[#15803D] mt-0.5">
                   {healthScore.statusLabel}
                 </div>
               </div>
             </div>
 
             <div className="lg:col-span-8">
-              <p className="text-sm text-slate-300 leading-relaxed">{healthScore.summary}</p>
+              <p className="text-sm text-[#111827] leading-relaxed">{healthScore.summary}</p>
             </div>
           </div>
 
@@ -179,12 +186,12 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
             {dimensionsList.map((dim) => (
               <div key={dim.label} className="space-y-2">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-xs font-medium text-slate-300 truncate">{dim.label}</span>
-                  <span className="text-xs font-mono tabular-nums font-semibold text-slate-100">
+                  <span className="text-xs font-medium text-[#111827] truncate">{dim.label}</span>
+                  <span className="text-xs font-mono tabular-nums font-semibold text-[#0B0F0D]">
                     {dim.score}/100
                   </span>
                 </div>
-                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-[#F1F5F3] rounded-full overflow-hidden">
                   <div
                     className={`h-full ${getBarColor(dim.status)}`}
                     style={{ width: `${Math.min(100, Math.max(5, dim.score))}%` }}
@@ -193,81 +200,84 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
                 <div className="text-xs font-mono">
                   <span className={getStatusTextColor(dim.status)}>{dim.status}</span>
                 </div>
-                <p className="text-xs text-slate-400 leading-normal">{dim.detail}</p>
+                <p className="text-xs text-[#64748B] leading-normal">{dim.detail}</p>
               </div>
             ))}
           </div>
 
           {/* Quantitative Activity Strip */}
-          <div className="px-6 py-4 bg-slate-950/50 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="px-6 py-4 bg-[#F8FAF9] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
-              <div className="text-xs text-slate-400">Recent Commits</div>
-              <div className="text-base font-semibold font-mono tabular-nums text-slate-100 mt-0.5">
-                {stats.recentCommitsCount} sampled
+              <div className="text-xs text-[#64748B]">Recent Development</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-[#0B0F0D] mt-0.5">
+                {stats.recentCommitsCount} commits
               </div>
             </div>
             <div>
-              <div className="text-xs text-slate-400">Last Commit Activity</div>
-              <div className="text-base font-semibold font-mono tabular-nums text-slate-100 mt-0.5">
+              <div className="text-xs text-[#64748B]">Last Commit Activity</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-[#0B0F0D] mt-0.5">
                 {stats.daysSinceLastCommit === 0 ? 'Today' : `${stats.daysSinceLastCommit}d ago`}
               </div>
             </div>
             <div>
-              <div className="text-xs text-slate-400">PR Merge Ratio</div>
-              <div className="text-base font-semibold font-mono tabular-nums text-slate-100 mt-0.5">
+              <div className="text-xs text-[#64748B]">PR Merge Ratio</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-[#0B0F0D] mt-0.5">
                 {stats.prMergeRatioPercent}%
               </div>
             </div>
             <div>
-              <div className="text-xs text-slate-400">Avg Issue Discussion</div>
-              <div className="text-base font-semibold font-mono tabular-nums text-slate-100 mt-0.5">
+              <div className="text-xs text-[#64748B]">Avg Issue Discussion</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-[#0B0F0D] mt-0.5">
                 {stats.avgIssueComments} comments
               </div>
             </div>
             <div>
-              <div className="text-xs text-slate-400">Top Maintainer Share</div>
-              <div className="text-base font-semibold font-mono tabular-nums text-slate-100 mt-0.5">
+              <div className="text-xs text-[#64748B]">Top Maintainer Share</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-[#0B0F0D] mt-0.5">
                 {stats.topContributorSharePercent}%
               </div>
             </div>
             <div>
-              <div className="text-xs text-slate-400">Contributing Guide</div>
-              <div className="text-base font-semibold font-mono tabular-nums text-slate-100 mt-0.5">
-                {report.repo.hasContributingGuide ? 'Present' : 'Missing'}
+              <div className="text-xs text-[#64748B]">Documentation</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-[#15803D] mt-0.5">
+                {report.repo.hasContributingGuide ? 'Guide Present' : 'Standard README'}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Section 02: Repository Insights & Architecture */}
+      {/* Section 02: Repository Insights */}
       <section className="space-y-4">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold text-slate-100">
-            02. Repository Insights &amp; Codebase Structure
-          </h2>
-          <span className="text-xs font-mono text-slate-400">
-            Architecture · Modules · Contributor Balance
+          <div className="flex items-center gap-2.5">
+            <span className="w-1 h-5 bg-[#15803D] rounded-full shrink-0" />
+            <h2 className="text-lg font-semibold text-[#0B0F0D]">
+              Repository Insights
+            </h2>
+          </div>
+          <span className="text-xs font-mono text-[#64748B]">
+            Architecture · Codebase Organization · Contributor Activity · Testing
           </span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left 7 Cols: Architectural Analysis & Key Directories */}
-          <div className="lg:col-span-7 border border-slate-800 bg-slate-900/50 rounded-xl divide-y divide-slate-800">
+          <div className="lg:col-span-7 border border-[#DDE5DF] bg-white rounded-xl divide-y divide-[#DDE5DF]">
             <div className="p-6 space-y-4">
               <div>
-                <h3 className="text-sm font-semibold text-slate-200 mb-1">
-                  Architecture &amp; Execution Flow
+                <h3 className="text-sm font-semibold text-[#0B0F0D] mb-1">
+                  Architecture
                 </h3>
-                <p className="text-sm text-slate-300 leading-relaxed">
+                <p className="text-sm text-[#111827] leading-relaxed">
                   {insights.architectureOverview}
                 </p>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-slate-200 mb-1">
-                  Codebase Organization &amp; Onboarding Readiness
+                <h3 className="text-sm font-semibold text-[#0B0F0D] mb-1">
+                  Codebase Organization &amp; Testing
                 </h3>
-                <p className="text-sm text-slate-300 leading-relaxed">
+                <p className="text-sm text-[#111827] leading-relaxed">
                   {insights.codebaseStructureSummary} {insights.onboardingReadiness}
                 </p>
               </div>
@@ -275,39 +285,39 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
 
             {/* Key Directories Table */}
             <div className="p-6">
-              <h3 className="text-sm font-semibold text-slate-200 mb-3">
-                Key Directories &amp; High-Leverage Modules
+              <h3 className="text-sm font-semibold text-[#0B0F0D] mb-3">
+                Key Directories &amp; Core Modules
               </h3>
-              <div className="divide-y divide-slate-800/80 border-t border-b border-slate-800/80">
+              <div className="divide-y divide-[#DDE5DF] border-t border-b border-[#DDE5DF]">
                 {insights.keyDirectories.map((dir) => (
                   <div
                     key={dir.path}
                     className="py-2.5 flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 text-xs"
                   >
-                    <span className="font-mono text-sky-400 font-medium shrink-0">{dir.path}</span>
-                    <span className="text-slate-300 sm:text-right">{dir.purpose}</span>
+                    <span className="font-mono text-[#15803D] font-semibold shrink-0">{dir.path}</span>
+                    <span className="text-[#111827] sm:text-right">{dir.purpose}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Right 5 Cols: Contributor Distribution & Maintenance Risks Preview */}
-          <div className="lg:col-span-5 border border-slate-800 bg-slate-900/50 rounded-xl divide-y divide-slate-800">
+          {/* Right 5 Cols: Contributor Activity & Maintenance Risks */}
+          <div className="lg:col-span-5 border border-[#DDE5DF] bg-white rounded-xl divide-y divide-[#DDE5DF]">
             <div className="p-6">
               <div className="flex items-baseline justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-200">
-                  Contributor Concentration
+                <h3 className="text-sm font-semibold text-[#0B0F0D]">
+                  Contributor Activity
                 </h3>
-                <span className="text-xs font-mono tabular-nums text-slate-400">
+                <span className="text-xs font-mono tabular-nums text-[#64748B]">
                   Top 3 Share: {stats.top3ContributorsSharePercent}%
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+              <p className="text-xs text-[#64748B] mb-4 leading-relaxed">
                 {insights.contributorDynamics}
               </p>
 
-              <div className="divide-y divide-slate-800/80 border-t border-b border-slate-800/80">
+              <div className="divide-y divide-[#DDE5DF] border-t border-b border-[#DDE5DF]">
                 {contributors.slice(0, 5).map((contributor) => (
                   <div
                     key={contributor.login}
@@ -317,18 +327,18 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
                       href={contributor.htmlUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-mono text-slate-200 hover:text-sky-400 transition-colors truncate"
+                      className="font-mono text-[#111827] hover:text-[#15803D] font-medium transition-colors truncate"
                     >
                       @{contributor.login}
                     </a>
                     <div className="flex items-center gap-3 shrink-0">
-                      <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="w-24 h-1.5 bg-[#F1F5F3] rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-sky-400"
+                          className="h-full bg-[#15803D]"
                           style={{ width: `${Math.min(100, contributor.sharePercentage)}%` }}
                         />
                       </div>
-                      <span className="font-mono tabular-nums text-slate-400 w-24 text-right">
+                      <span className="font-mono tabular-nums text-[#64748B] w-24 text-right">
                         {contributor.contributions} ({contributor.sharePercentage}%)
                       </span>
                     </div>
@@ -340,37 +350,37 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
             {/* Maintenance Risks Summary List */}
             <div className="p-6 space-y-3">
               <div className="flex items-baseline justify-between">
-                <h3 className="text-sm font-semibold text-slate-200">
-                  Detected Maintenance Risks ({maintenanceRisks.length})
+                <h3 className="text-sm font-semibold text-[#0B0F0D]">
+                  Maintenance Risks ({maintenanceRisks.length})
                 </h3>
                 <button
                   type="button"
                   onClick={() => onNavigateTab('risks')}
-                  className="text-xs font-medium text-sky-400 hover:underline cursor-pointer"
+                  className="text-xs font-semibold text-[#15803D] hover:underline cursor-pointer"
                 >
                   Inspect Full Audit
                 </button>
               </div>
-              <div className="divide-y divide-slate-800/80">
+              <div className="divide-y divide-[#DDE5DF]">
                 {maintenanceRisks.slice(0, 3).map((risk) => (
                   <div key={risk.id} className="py-2.5 space-y-1">
                     <div className="flex items-center justify-between gap-2 text-xs font-mono">
-                      <span className="text-slate-200 font-sans font-medium truncate">
+                      <span className="text-[#0B0F0D] font-sans font-medium truncate">
                         {risk.title}
                       </span>
                       <span
-                        className={`shrink-0 ${
+                        className={`shrink-0 font-semibold ${
                           risk.severity === 'High'
-                            ? 'text-rose-400'
+                            ? 'text-red-700'
                             : risk.severity === 'Medium'
-                            ? 'text-amber-400'
-                            : 'text-emerald-400'
+                            ? 'text-amber-700'
+                            : 'text-[#15803D]'
                         }`}
                       >
                         {risk.severity} Risk
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 line-clamp-2">{risk.metricEvidence}</p>
+                    <p className="text-xs text-[#64748B] line-clamp-2">{risk.metricEvidence}</p>
                   </div>
                 ))}
               </div>

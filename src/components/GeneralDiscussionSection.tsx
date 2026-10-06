@@ -829,22 +829,22 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <div className="text-xs font-mono text-sky-400 flex items-center gap-2">
-            <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="text-xs font-mono text-[#15803D] font-semibold flex items-center gap-2">
+            <Wifi className="w-3.5 h-3.5 text-[#15803D]" />
             <span>
-              Real-Time WebSocket &amp; Socket.IO Mesh · Delivery &amp; Read Receipts Active
+              ContribLens Live Contributor Channels · Delivery &amp; Read Receipts
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-slate-100 mt-1">
+          <h2 className="text-2xl font-bold text-[#0B0F0D] mt-1">
             General Discussion &amp; Issue Collaboration
           </h2>
-          <p className="text-sm text-slate-300 mt-0.5">
-            Chat live with other developers across any browser or deployment URL with real-time delivery and read receipts.
+          <p className="text-sm text-[#64748B] mt-0.5">
+            Coordinate with other open-source contributors, share target issues, and discuss pull request strategies in real time.
           </p>
         </div>
-        <div className="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>{isRealtimeConnected ? 'Live WebSocket Connected' : 'Connecting WebSocket...'}</span>
+        <div className="text-xs font-mono text-[#15803D] font-semibold flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-[#22C55E]" />
+          <span>{isRealtimeConnected ? 'Live Connection Active' : 'Connecting...'}</span>
         </div>
       </div>
 
@@ -853,8 +853,8 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
         {/* Left Sidebar: Channels, Identity & Active Contributors */}
         <aside className="lg:col-span-4 space-y-5">
           {/* Channels List */}
-          <div className="border border-slate-800 bg-slate-900/50 rounded-xl p-4 space-y-3">
-            <div className="text-xs font-mono text-slate-400 uppercase tracking-wider">
+          <div className="border border-[#DDE5DF] bg-white rounded-xl p-4 space-y-3">
+            <div className="text-xs font-mono text-[#64748B] uppercase tracking-wider font-semibold">
               Discussion Channels
             </div>
             <div className="space-y-1">
@@ -868,21 +868,21 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                     onClick={() => setActiveChannel(ch.id)}
                     className={`w-full px-3 py-2.5 rounded-lg text-left transition-colors flex items-center justify-between gap-2 cursor-pointer ${
                       isActive
-                        ? 'bg-sky-400 text-slate-950 font-semibold'
-                        : 'text-slate-300 hover:bg-slate-800/70'
+                        ? 'bg-[#15803D] text-white font-semibold'
+                        : 'text-[#111827] hover:bg-[#F1F5F3]'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <Hash
                         className={`w-4 h-4 shrink-0 ${
-                          isActive ? 'text-slate-950' : 'text-sky-400'
+                          isActive ? 'text-white' : 'text-[#15803D]'
                         }`}
                       />
                       <span className="text-xs font-mono truncate">{ch.label}</span>
                     </div>
                     <span
                       className={`text-[11px] font-mono tabular-nums ${
-                        isActive ? 'text-slate-900' : 'text-slate-500'
+                        isActive ? 'text-white/90' : 'text-[#64748B]'
                       }`}
                     >
                       {count}
@@ -894,9 +894,9 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
           </div>
 
           {/* Contributor Identity Card */}
-          <div className="border border-slate-800 bg-slate-900/50 rounded-xl p-4 space-y-3">
+          <div className="border border-[#DDE5DF] bg-white rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono text-slate-400 uppercase tracking-wider">
+              <span className="text-xs font-mono text-[#64748B] uppercase tracking-wider font-semibold">
                 Your Chat Identity
               </span>
               {!authenticatedUser && !isEditingHandle && (
@@ -906,7 +906,7 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                     setHandleDraft(customHandle);
                     setIsEditingHandle(true);
                   }}
-                  className="text-xs font-mono text-sky-400 hover:underline cursor-pointer"
+                  className="text-xs font-mono text-[#15803D] font-semibold hover:underline cursor-pointer"
                 >
                   Change Handle
                 </button>
@@ -919,18 +919,18 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                   src={effectiveAvatar}
                   alt={effectiveHandle}
                   referrerPolicy="no-referrer"
-                  className="w-10 h-10 rounded-full border border-sky-400/50 object-cover shrink-0"
+                  className="w-10 h-10 rounded-full border border-[#15803D]/50 object-cover shrink-0"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-slate-800 border border-sky-400/40 flex items-center justify-center text-xs font-bold font-mono text-sky-400 shrink-0">
+                <div className="w-10 h-10 rounded-full bg-[#F1F5F3] border border-[#15803D]/40 flex items-center justify-center text-xs font-bold font-mono text-[#15803D] shrink-0">
                   {effectiveHandle.slice(0, 2).toUpperCase()}
                 </div>
               )}
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-slate-100 truncate">
+                <div className="text-sm font-semibold text-[#0B0F0D] truncate">
                   {effectiveName}
                 </div>
-                <div className="text-xs font-mono text-emerald-400 truncate">
+                <div className="text-xs font-mono text-[#15803D] font-semibold truncate">
                   @{effectiveHandle}
                 </div>
               </div>
@@ -943,11 +943,11 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                   value={handleDraft}
                   onChange={(e) => setHandleDraft(e.target.value)}
                   placeholder="Enter display handle"
-                  className="flex-1 px-2.5 py-1.5 text-xs font-mono bg-slate-950 border border-slate-700 rounded-md text-slate-100 focus:outline-none focus:border-sky-400"
+                  className="flex-1 px-2.5 py-1.5 text-xs font-mono bg-[#F8FAF9] border border-[#DDE5DF] rounded-md text-[#0B0F0D] focus:outline-none focus:border-[#15803D]"
                 />
                 <button
                   type="submit"
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 rounded-md cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-[#15803D] hover:bg-[#166534] rounded-md cursor-pointer"
                 >
                   Save
                 </button>
@@ -956,13 +956,13 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
           </div>
 
           {/* Active Contributors List */}
-          <div className="border border-slate-800 bg-slate-900/50 rounded-xl p-4 space-y-3">
+          <div className="border border-[#DDE5DF] bg-white rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <div className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-emerald-400" />
+              <div className="text-xs font-mono text-[#64748B] uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-[#15803D]" />
                 <span>Active in Discussion</span>
               </div>
-              <span className="text-xs font-mono text-emerald-400">
+              <span className="text-xs font-mono font-semibold text-[#15803D]">
                 {Math.max(1, onlineUsers.length)}
               </span>
             </div>
@@ -986,10 +986,10 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                   className="flex items-center justify-between gap-2 text-xs py-1"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                    <span className="font-mono text-slate-200 truncate">@{u.handle}</span>
+                    <span className="w-2 h-2 rounded-full bg-[#22C55E] shrink-0" />
+                    <span className="font-mono text-[#111827] font-medium truncate">@{u.handle}</span>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-500 truncate">
+                  <span className="text-[11px] font-mono text-[#64748B] truncate">
                     #{u.activeChannel}
                   </span>
                 </div>
@@ -999,31 +999,31 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
         </aside>
 
         {/* Right Main Column: Real-Time Message Feed & Composer */}
-        <section className="lg:col-span-8 border border-slate-800 bg-slate-900/50 rounded-xl flex flex-col h-[620px] overflow-hidden">
+        <section className="lg:col-span-8 border border-[#DDE5DF] bg-white rounded-xl flex flex-col h-[620px] overflow-hidden">
           {/* Channel Header */}
-          <div className="px-5 py-3.5 bg-slate-950/90 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="px-5 py-3.5 bg-[#F8FAF9] border-b border-[#DDE5DF] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <div className="flex items-center gap-2">
-                <Hash className="w-4 h-4 text-sky-400" />
-                <h3 className="text-sm font-bold font-mono text-slate-100">
+                <Hash className="w-4 h-4 text-[#15803D]" />
+                <h3 className="text-sm font-bold font-mono text-[#0B0F0D]">
                   {activeChannelMeta.label}
                 </h3>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-[#64748B] mt-0.5">
                 {activeChannelMeta.description}
               </p>
             </div>
-            <div className="text-xs font-mono text-slate-400 shrink-0">
+            <div className="text-xs font-mono text-[#64748B] shrink-0">
               {channelMessages.length} messages
             </div>
           </div>
 
           {/* Messages Stream */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-white">
             {channelMessages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center space-y-2 text-slate-400">
-                <MessageSquare className="w-7 h-7 text-slate-600" />
-                <p className="text-sm font-semibold text-slate-300">
+              <div className="h-full flex flex-col items-center justify-center text-center space-y-2 text-[#64748B]">
+                <MessageSquare className="w-7 h-7 text-[#64748B]" />
+                <p className="text-sm font-semibold text-[#111827]">
                   No messages in #{activeChannelMeta.label} yet
                 </p>
               </div>
@@ -1043,8 +1043,8 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                     key={msg.id}
                     className={`p-4 rounded-xl border transition-colors ${
                       isSelf
-                        ? 'bg-slate-950/90 border-sky-500/40'
-                        : 'bg-slate-950/60 border-slate-800/90'
+                        ? 'bg-[#F8FAF9] border-[#15803D]/40'
+                        : 'bg-white border-[#DDE5DF]'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -1054,56 +1054,56 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                             src={msg.authorAvatar}
                             alt={msg.authorHandle}
                             referrerPolicy="no-referrer"
-                            className="w-8 h-8 rounded-full border border-slate-700 object-cover shrink-0"
+                            className="w-8 h-8 rounded-full border border-[#DDE5DF] object-cover shrink-0"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold font-mono text-sky-400 shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-[#F1F5F3] border border-[#DDE5DF] flex items-center justify-center text-xs font-bold font-mono text-[#15803D] shrink-0">
                             <User className="w-3.5 h-3.5" />
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-xs font-bold text-slate-100">
+                          <span className="text-xs font-bold text-[#0B0F0D]">
                             {msg.authorName}
                           </span>
-                          <span className="text-xs font-mono text-sky-400">
+                          <span className="text-xs font-mono text-[#15803D] font-semibold">
                             @{msg.authorHandle}
                           </span>
                         </div>
                       </div>
-                      <span className="text-[11px] font-mono text-slate-500 shrink-0">
+                      <span className="text-[11px] font-mono text-[#64748B] shrink-0">
                         {formatTime(msg.createdAt)}
                       </span>
                     </div>
 
-                    <p className="mt-2.5 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap break-words">
+                    <p className="mt-2.5 text-sm text-[#111827] leading-relaxed whitespace-pre-wrap break-words">
                       {msg.text}
                     </p>
 
                     {/* Delivery & Read Receipts Footer */}
                     {!isSystem && (
-                      <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-end gap-2 text-[11px] font-mono">
+                      <div className="mt-2.5 pt-2 border-t border-[#DDE5DF] flex items-center justify-end gap-2 text-[11px] font-mono">
                         {isSelf ? (
                           isSending ? (
-                            <span className="inline-flex items-center gap-1 text-amber-400">
+                            <span className="inline-flex items-center gap-1 text-amber-700">
                               <Clock className="w-3.5 h-3.5 animate-pulse" />
                               <span>Sending to server...</span>
                             </span>
                           ) : isRead ? (
-                            <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                            <span className="inline-flex items-center gap-1.5 text-[#15803D] font-semibold">
                               <CheckCheck className="w-3.5 h-3.5" />
                               <span>
                                 Read by {readers.map((r) => `@${r}`).join(', ')}
                               </span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-sky-400">
+                            <span className="inline-flex items-center gap-1 text-[#166534]">
                               <Check className="w-3.5 h-3.5" />
                               <span>Delivered to server</span>
                             </span>
                           )
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-slate-400">
-                            <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="inline-flex items-center gap-1.5 text-[#64748B]">
+                            <CheckCheck className="w-3.5 h-3.5 text-[#15803D]" />
                             <span>
                               {isRead
                                 ? `Acknowledged by ${readers.map((r) => `@${r}`).join(', ')}`
@@ -1123,14 +1123,14 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
           {/* Message Composer */}
           <form
             onSubmit={handleSendMessage}
-            className="p-4 bg-slate-950 border-t border-slate-800 space-y-2"
+            className="p-4 bg-[#F8FAF9] border-t border-[#DDE5DF] space-y-2"
           >
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="font-mono text-[11px] text-slate-500">
+            <div className="flex items-center justify-between text-xs text-[#64748B]">
+              <span className="font-mono text-[11px] text-[#64748B]">
                 ✓ Delivered to server · ✓✓ Read by participants
               </span>
-              <span className="font-mono text-[11px] text-slate-400">
-                Posting as <span className="text-sky-400">@{effectiveHandle}</span>
+              <span className="font-mono text-[11px] text-[#64748B]">
+                Posting as <span className="text-[#15803D] font-semibold">@{effectiveHandle}</span>
               </span>
             </div>
 
@@ -1141,12 +1141,12 @@ export const GeneralDiscussionSection: React.FC<GeneralDiscussionSectionProps> =
                 onChange={(e) => setMessageInput(e.target.value)}
                 placeholder={`Message #${activeChannelMeta.label}...`}
                 aria-label="Write a discussion message"
-                className="flex-1 px-4 py-2.5 text-sm bg-slate-900 border border-slate-800 rounded-lg text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-400 transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm bg-white border border-[#DDE5DF] rounded-lg text-[#0B0F0D] placeholder:text-[#64748B] focus:outline-none focus:border-[#15803D] transition-colors"
               />
               <button
                 type="submit"
                 disabled={!messageInput.trim()}
-                className="px-5 py-2.5 text-xs font-semibold text-slate-950 bg-sky-400 hover:bg-sky-300 disabled:opacity-50 rounded-lg transition-colors inline-flex items-center gap-2 shrink-0 cursor-pointer"
+                className="px-5 py-2.5 text-xs font-semibold text-white bg-[#15803D] hover:bg-[#166534] disabled:opacity-50 rounded-lg transition-colors inline-flex items-center gap-2 shrink-0 cursor-pointer"
               >
                 <span>Send</span>
                 <Send className="w-3.5 h-3.5" />

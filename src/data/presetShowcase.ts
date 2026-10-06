@@ -2,12 +2,6 @@ import { ContribLensAnalysisResponse, ContributionPlan } from '../types';
 
 export const PRESET_REPOSITORIES = [
   {
-    fullName: 'pallets/click',
-    label: 'pallets/click',
-    language: 'Python',
-    tagline: 'Composable command line interface toolkit in Python'
-  },
-  {
     fullName: 'tiangolo/fastapi',
     label: 'tiangolo/fastapi',
     language: 'Python',
@@ -35,11 +29,11 @@ export const PRESET_REPOSITORIES = [
 
 export const INITIAL_ANALYSIS_REPORT: ContribLensAnalysisResponse = {
   repo: {
-    owner: 'pallets',
-    name: 'click',
-    fullName: 'pallets/click',
-    description: 'Python composable command line interface toolkit with declarative argument parsing, parameter types, and testing utilities.',
-    htmlUrl: 'https://github.com/pallets/click',
+    owner: '',
+    name: '',
+    fullName: '',
+    description: '',
+    htmlUrl: 'https://github.com',
     stars: 16140,
     forks: 1920,
     openIssuesCount: 142,
@@ -50,7 +44,7 @@ export const INITIAL_ANALYSIS_REPORT: ContribLensAnalysisResponse = {
     createdAt: '2014-05-03T11:20:00Z',
     updatedAt: '2026-10-03T18:40:00Z',
     pushedAt: '2026-10-02T21:15:00Z',
-    topics: ['python', 'cli', 'command-line', 'argument-parser', 'pallets', 'terminal'],
+    topics: ['python', 'cli', 'command-line', 'argument-parser', 'terminal'],
     hasContributingGuide: true,
     hasCodeOfConduct: true
   },
@@ -339,10 +333,10 @@ export const INITIAL_ANALYSIS_REPORT: ContribLensAnalysisResponse = {
 };
 
 export const INITIAL_CONTRIBUTION_PLAN: ContributionPlan = {
-  repoFullName: 'pallets/click',
+  repoFullName: 'Active Workspace',
   issueNumber: 184,
   issueTitle: 'Improve CSV and delimited option value parser when quoted strings contain escaped commas',
-  issueUrl: 'https://github.com/pallets/click/issues',
+  issueUrl: 'https://github.com',
   difficulty: 'Beginner–Intermediate',
   estimatedEffort: '2–4 hours',
   skills: ['Python', 'parsing', 'unit testing'],

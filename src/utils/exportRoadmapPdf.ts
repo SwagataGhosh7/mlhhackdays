@@ -69,26 +69,26 @@ export function exportRoadmapToPdf(
   };
 
   // Top Header Box
-  doc.setFillColor(15, 23, 42);
+  doc.setFillColor(20, 83, 45);
   doc.rect(0, 0, pageWidth, 82, 'F');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.setTextColor(248, 250, 252);
+  doc.setTextColor(255, 255, 255);
   doc.text('ContribLens — Open-Source Contribution Roadmap', margin, 34);
 
   doc.setFont('courier', 'normal');
   doc.setFontSize(9);
-  doc.setTextColor(56, 189, 248);
+  doc.setTextColor(220, 252, 231);
   doc.text(
-    `Repository: ${report.repo.fullName} (${report.repo.isPrivate ? 'Private' : 'Public'})  |  Powered by GitHub & Gemma 4`,
+    `Repository: ${report.repo.fullName} (${report.repo.isPrivate ? 'Private' : 'Public'})  |  ContribLens Analysis`,
     margin,
     52
   );
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
-  doc.setTextColor(148, 163, 184);
+  doc.setTextColor(241, 245, 243);
   doc.text(
     `Language: ${report.repo.language}  ·  License: ${report.repo.license}  ·  Stars: ${report.repo.stars.toLocaleString()}  ·  Target Profile: ${report.targetSkillLevel}`,
     margin,

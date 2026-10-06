@@ -8,7 +8,7 @@ import {
   Minimize2,
   RefreshCw,
   Send,
-  Sparkles,
+  Terminal,
   Trash2,
   X,
 } from 'lucide-react';
@@ -195,12 +195,13 @@ export const ContribBotWidget: React.FC<ContribBotWidgetProps> = ({
   const [copiedCodeIdx, setCopiedCodeIdx] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  const repoDisplayName = report.repo.fullName || 'Open-Source Workspace';
   const initialMessage: ChatMessage = {
     id: 'welcome',
     role: 'assistant',
-    content: `Hi! I'm **ContribBot**, your open-source contribution & troubleshooting assistant.
+    content: `Hi! I'm your **Contribution Mentor**, here to help you navigate open-source repositories and contributions.
 
-I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and Issue **#${activePlan.issueNumber}**. Ask me anything about picking an issue, setting up tests, fixing Git/PR conflicts, or connecting your GitHub account!`,
+I'm ready to help with **${repoDisplayName}** and Issue **#${activePlan.issueNumber}**. Ask me anything about picking an issue, setting up tests, fixing Git/PR conflicts, or connecting your GitHub account!`,
     timestamp: 'Just now',
   };
 
@@ -289,7 +290,7 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
       {
         id: `welcome-${Date.now()}`,
         role: 'assistant',
-        content: `Chat reset! I'm tracking **${report.repo.fullName}** (${report.repo.language}) and Issue **#${activePlan.issueNumber}**. How can I help you contribute today?`,
+        content: `Chat reset! I'm tracking **${repoDisplayName}** and Issue **#${activePlan.issueNumber}**. How can I help you contribute today?`,
         timestamp: 'Just now',
       },
     ]);
@@ -314,19 +315,19 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
         return (
           <div
             key={blockId}
-            className="my-2.5 rounded-lg overflow-hidden border border-slate-700/90 bg-slate-950"
+            className="my-2.5 rounded-lg overflow-hidden border border-[#111827] bg-[#0B0F0D]"
           >
-            <div className="px-3 py-1.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <div className="px-3 py-1.5 bg-[#111827] border-b border-[#111827] flex items-center justify-between text-[11px] font-mono text-[#F1F5F3]">
               <span>{hasLang ? firstLine : 'terminal'}</span>
               <button
                 type="button"
                 onClick={() => handleCopyCode(codeContent, blockId)}
-                className="text-slate-300 hover:text-sky-400 inline-flex items-center gap-1 cursor-pointer"
+                className="text-[#F1F5F3] hover:text-[#22C55E] inline-flex items-center gap-1 cursor-pointer"
               >
                 {copiedCodeIdx === blockId ? (
                   <>
-                    <Check className="w-3 h-3 text-emerald-400" />
-                    <span className="text-emerald-400">Copied</span>
+                    <Check className="w-3 h-3 text-[#22C55E]" />
+                    <span className="text-[#22C55E]">Copied</span>
                   </>
                 ) : (
                   <>
@@ -336,7 +337,7 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
                 )}
               </button>
             </div>
-            <pre className="p-3 text-xs font-mono text-sky-300 overflow-x-auto leading-relaxed">
+            <pre className="p-3 text-xs font-mono text-[#F8FAF9] overflow-x-auto leading-relaxed">
               <code>{codeContent}</code>
             </pre>
           </div>
@@ -357,7 +358,7 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
                   {inlineParts.map((part, pIdx) => {
                     if (part.startsWith('**') && part.endsWith('**')) {
                       return (
-                        <strong key={pIdx} className="font-semibold text-slate-100">
+                        <strong key={pIdx} className="font-semibold text-[#0B0F0D]">
                           {part.slice(2, -2)}
                         </strong>
                       );
@@ -366,7 +367,7 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
                       return (
                         <code
                           key={pIdx}
-                          className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono text-[11px] text-sky-300"
+                          className="px-1.5 py-0.5 rounded bg-[#F1F5F3] border border-[#DDE5DF] font-mono text-[11px] text-[#15803D]"
                         >
                           {part.slice(1, -1)}
                         </code>
@@ -389,41 +390,38 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="px-4 py-3 rounded-full bg-sky-400 hover:bg-sky-300 text-slate-950 font-semibold text-xs shadow-xl shadow-sky-950/60 border border-sky-300 transition-all flex items-center gap-2.5 cursor-pointer"
-          aria-label="Open ContribBot assistant"
+          className="px-4 py-3 rounded-lg bg-[#15803D] hover:bg-[#166534] text-white font-semibold text-xs shadow-lg border border-[#14532D] transition-all flex items-center gap-2.5 cursor-pointer"
+          aria-label="Open Contribution Mentor"
         >
           <Bot className="w-4 h-4" />
-          <span>ContribBot</span>
-          <span className="px-1.5 py-0.5 text-[10px] font-mono bg-slate-950 text-sky-300 rounded-full">
-            Ask Help
-          </span>
+          <span>Contribution Mentor</span>
         </button>
       )}
 
       {/* Open Chat Panel */}
       {isOpen && (
         <div
-          className={`flex flex-col bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden transition-all ${
+          className={`flex flex-col bg-white border border-[#DDE5DF] rounded-2xl shadow-xl overflow-hidden transition-all ${
             isExpanded
               ? 'w-[92vw] sm:w-[560px] h-[78vh] max-h-[680px]'
               : 'w-[90vw] sm:w-[410px] h-[540px] max-h-[80vh]'
           }`}
         >
           {/* Header */}
-          <div className="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2">
+          <div className="px-4 py-3 bg-[#F8FAF9] border-b border-[#DDE5DF] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-400/40 flex items-center justify-center text-sky-400 shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-[#15803D]/10 border border-[#15803D]/30 flex items-center justify-center text-[#15803D] shrink-0">
                 <Bot className="w-4 h-4" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs font-bold text-slate-100">ContribBot</h3>
-                  <span className="text-[10px] font-mono text-emerald-400">
-                    · OSS Mentor
+                  <h3 className="text-xs font-bold text-[#0B0F0D]">Contribution Mentor</h3>
+                  <span className="text-[10px] font-mono text-[#15803D] font-semibold">
+                    · ContribLens
                   </span>
                 </div>
-                <p className="text-[11px] font-mono text-slate-400 truncate">
-                  {report.repo.fullName} · #{activePlan.issueNumber}
+                <p className="text-[11px] font-mono text-[#64748B] truncate">
+                  {repoDisplayName} · #{activePlan.issueNumber}
                 </p>
               </div>
             </div>
@@ -432,7 +430,7 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
               <button
                 type="button"
                 onClick={handleResetChat}
-                className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-[#64748B] hover:text-[#0B0F0D] rounded-lg transition-colors cursor-pointer"
                 title="Clear conversation"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -440,7 +438,7 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
               <button
                 type="button"
                 onClick={() => setIsExpanded((prev) => !prev)}
-                className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-[#64748B] hover:text-[#0B0F0D] rounded-lg transition-colors cursor-pointer"
                 title={isExpanded ? 'Compact size' : 'Expand size'}
               >
                 {isExpanded ? (
@@ -452,8 +450,8 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
-                title="Close ContribBot"
+                className="p-1.5 text-[#64748B] hover:text-[#0B0F0D] rounded-lg transition-colors cursor-pointer"
+                title="Close Contribution Mentor"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -461,7 +459,7 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
           </div>
 
           {/* Messages Stream */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-900/90">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-white">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -472,8 +470,8 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
                 <div
                   className={`max-w-[90%] rounded-xl px-3.5 py-2.5 ${
                     msg.role === 'user'
-                      ? 'bg-sky-400 text-slate-950 font-medium'
-                      : 'bg-slate-950/90 border border-slate-800 text-slate-200'
+                      ? 'bg-[#15803D] text-white font-medium'
+                      : 'bg-[#F8FAF9] border border-[#DDE5DF] text-[#111827]'
                   }`}
                 >
                   {msg.role === 'user' ? (
@@ -482,31 +480,31 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
                     renderFormattedContent(msg.content, msg.id)
                   )}
                 </div>
-                <span className="text-[10px] font-mono text-slate-500 mt-1 px-1">
-                  {msg.role === 'user' ? 'You' : 'ContribBot'} · {msg.timestamp}
+                <span className="text-[10px] font-mono text-[#64748B] mt-1 px-1">
+                  {msg.role === 'user' ? 'You' : 'Mentor'} · {msg.timestamp}
                 </span>
               </div>
             ))}
 
             {isSending && (
-              <div className="flex items-center gap-2 text-xs text-sky-400 font-mono px-2 py-1">
+              <div className="flex items-center gap-2 text-xs text-[#15803D] font-mono px-2 py-1">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>ContribBot is analyzing...</span>
+                <span>Analyzing repository context...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Quick Troubleshooting Prompts */}
-          <div className="px-3 py-2 bg-slate-950/80 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto">
-            <Sparkles className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+          <div className="px-3 py-2 bg-[#F8FAF9] border-t border-[#DDE5DF] flex items-center gap-1.5 overflow-x-auto">
+            <Terminal className="w-3.5 h-3.5 text-[#15803D] shrink-0" />
             {QUICK_PROMPTS.map((prompt) => (
               <button
                 key={prompt}
                 type="button"
                 disabled={isSending}
                 onClick={() => handleSendMessage(prompt)}
-                className="px-2.5 py-1 text-[11px] font-mono text-slate-300 hover:text-sky-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-md whitespace-nowrap shrink-0 transition-colors cursor-pointer"
+                className="px-2.5 py-1 text-[11px] font-mono text-[#111827] hover:text-[#15803D] bg-white hover:bg-[#F1F5F3] border border-[#DDE5DF] rounded-md whitespace-nowrap shrink-0 transition-colors cursor-pointer"
               >
                 {prompt}
               </button>
@@ -519,21 +517,21 @@ I'm currently tracking **${report.repo.fullName}** (${report.repo.language}) and
               e.preventDefault();
               handleSendMessage();
             }}
-            className="p-3 bg-slate-950 border-t border-slate-800 flex items-center gap-2"
+            className="p-3 bg-white border-t border-[#DDE5DF] flex items-center gap-2"
           >
-            <MessageSquare className="w-4 h-4 text-slate-500 ml-1 shrink-0" />
+            <MessageSquare className="w-4 h-4 text-[#64748B] ml-1 shrink-0" />
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={`Ask about ${report.repo.fullName}, Git PRs, or OAuth...`}
-              aria-label="Ask ContribBot a question"
-              className="flex-1 bg-transparent text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none"
+              placeholder={`Ask about ${repoDisplayName}, Git PRs, or OAuth...`}
+              aria-label="Ask Contribution Mentor a question"
+              className="flex-1 bg-transparent text-xs text-[#0B0F0D] placeholder:text-[#64748B] focus:outline-none"
             />
             <button
               type="submit"
               disabled={!input.trim() || isSending}
-              className="p-2 rounded-lg bg-sky-400 hover:bg-sky-300 disabled:opacity-40 text-slate-950 transition-colors cursor-pointer"
+              className="p-2 rounded-lg bg-[#15803D] hover:bg-[#166534] disabled:opacity-40 text-white transition-colors cursor-pointer"
               aria-label="Send message"
             >
               <Send className="w-3.5 h-3.5" />

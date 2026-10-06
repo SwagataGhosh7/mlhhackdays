@@ -4,12 +4,23 @@
   :root {
     --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    --color-primary-green: #15803D;
+    --color-dark-green: #166534;
+    --color-deep-forest: #14532D;
+    --color-success-green: #22C55E;
+    --color-surface-white: #FFFFFF;
+    --color-surface-offwhite: #F8FAF9;
+    --color-surface-lightgray: #F1F5F3;
+    --color-text-charcoal: #111827;
+    --color-text-nearblack: #0B0F0D;
+    --color-border-gray: #DDE5DF;
+    --color-text-muted: #64748B;
   }
 
   body {
     font-family: var(--font-sans);
-    background-color: #090d16;
-    color: #f1f5f9;
+    background-color: #F8FAF9;
+    color: #111827;
     letter-spacing: 0.01em;
   }
 
@@ -22,4 +33,3 @@
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
-

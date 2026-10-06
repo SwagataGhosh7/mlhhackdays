@@ -45,15 +45,14 @@ export default function App() {
   const [skillLevel, setSkillLevel] = useState<SkillLevel>('Beginner');
   const [report, setReport] = useState<ContribLensAnalysisResponse>(INITIAL_ANALYSIS_REPORT);
   const [activePlan, setActivePlan] = useState<ContributionPlan>(INITIAL_CONTRIBUTION_PLAN);
-  const [planCache, setPlanCache] = useState<Record<string, ContributionPlan>>({
-    'pallets/click#184': INITIAL_CONTRIBUTION_PLAN,
-  });
+  const [planCache, setPlanCache] = useState<Record<string, ContributionPlan>>({});
+  const [hasAnalyzedRepo, setHasAnalyzedRepo] = useState<boolean>(false);
 
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedRoadmap, setCopiedRoadmap] = useState<boolean>(false);
-  const [recentRepos, setRecentRepos] = useState<string[]>(['pallets/click']);
+  const [recentRepos, setRecentRepos] = useState<string[]>([]);
 
   // Separate state for Authenticated User Account vs Browsed Public GitHub Profile
   const [authProfile, setAuthProfile] = useState<UserContributionProfile | null>(null);
@@ -459,6 +458,7 @@ export default function App() {
       }
 
       setReport(newReport);
+      setHasAnalyzedRepo(true);
       if (activeTab === 'profile' || activeTab === 'browse' || activeTab === 'discussion') {
         setActiveTab('overview');
       }
@@ -557,7 +557,10 @@ export default function App() {
   ];
 
   return (
-    <div id="top" className="min-h-screen flex flex-col bg-[#090d16] text-slate-100">
+    <div id="top" className="min-h-screen flex flex-col bg-[#F8FAF9] text-[#111827]">
+      {/* Top Green Accent Line */}
+      <div className="h-1 w-full bg-gradient-to-r from-[#14532D] via-[#15803D] to-[#22C55E]" />
+
       {/* 3-Zone Top Navigation Header */}
       <Header
         activeTab={activeTab}
@@ -570,16 +573,16 @@ export default function App() {
       />
 
       {/* Mobile Navigation Bar */}
-      <div className="xl:hidden flex items-center gap-1 px-4 py-2 bg-slate-950 border-b border-slate-800 overflow-x-auto">
+      <div className="xl:hidden flex items-center gap-1 px-4 py-2 bg-white border-b border-[#DDE5DF] overflow-x-auto">
         {mobileTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => handleSelectTab(tab.id)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap shrink-0 ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === tab.id
-                ? 'bg-sky-400 text-slate-950 font-semibold'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#15803D] text-white font-semibold'
+                : 'text-[#64748B] hover:text-[#111827]'
             }`}
           >
             {tab.label}
@@ -590,6 +593,7 @@ export default function App() {
       {/* Repository Input & Skill Targeting Command Bar */}
       <RepoCommandBar
         repo={report.repo}
+        hasAnalyzedRepo={hasAnalyzedRepo}
         skillLevel={skillLevel}
         onSkillLevelChange={(newLevel) => {
           setSkillLevel(newLevel);
@@ -715,35 +719,35 @@ export default function App() {
       />
 
       {/* Quiet Footer */}
-      <footer className="border-t border-slate-800/80 py-6 px-6 mt-16">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div>ContribLens — Open-Source Contribution Intelligence</div>
-          <div className="flex items-center gap-4">
+      <footer className="border-t border-[#DDE5DF] bg-white py-6 px-6 mt-16">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#64748B]">
+          <div>ContribLens — Open-Source Contribution Platform</div>
+          <div className="flex flex-wrap items-center gap-4">
             <button
               type="button"
               onClick={() => setActiveTab('overview')}
-              className="hover:text-slate-300 transition-colors cursor-pointer"
+              className="hover:text-[#15803D] transition-colors cursor-pointer"
             >
-              Health Score
+              Project Health &amp; Maintenance
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('recommendations')}
-              className="hover:text-slate-300 transition-colors cursor-pointer"
+              className="hover:text-[#15803D] transition-colors cursor-pointer"
             >
               Recommended Issues
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('plan')}
-              className="hover:text-slate-300 transition-colors cursor-pointer"
+              className="hover:text-[#15803D] transition-colors cursor-pointer"
             >
               Contribution Plan
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('profile')}
-              className="hover:text-slate-300 transition-colors cursor-pointer"
+              className="hover:text-[#15803D] transition-colors cursor-pointer"
             >
               My Contributions
             </button>
@@ -751,7 +755,7 @@ export default function App() {
               href={report.repo.htmlUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-slate-300 transition-colors"
+              className="hover:text-[#15803D] transition-colors"
             >
               GitHub Repository
             </a>

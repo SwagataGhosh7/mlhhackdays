@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
-  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-sky-500/30 selection:text-sky-200">
+  <body class="bg-[#F8FAF9] text-[#111827] antialiased selection:bg-[#15803D]/20 selection:text-[#0B0F0D]">
     <div id="root"></div>
     <script>
       (function () {
@@ -22,7 +22,7 @@
           var code = params.get('code');
           if (code && window.opener) {
             document.body.innerHTML =
-              '<div style="padding:24px;font-family:sans-serif;color:#f1f5f9;">Completing GitHub authentication...</div>';
+              '<div style="padding:24px;font-family:sans-serif;color:#111827;">Completing GitHub authentication...</div>';
             fetch('/api/auth/github/exchange', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
