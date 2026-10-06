@@ -39,9 +39,17 @@ import {
 const SESSION_STORAGE_KEY = 'contriblens_gh_session_id';
 const ACCESS_TOKEN_STORAGE_KEY = 'contriblens_gh_access_token';
 const AUTHORIZED_CONFIRM_KEY = 'contriblens_gh_explicitly_authorized';
+const THEME_STORAGE_KEY = 'contriblens_theme_mode';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(THEME_STORAGE_KEY) === 'dark';
+    } catch {
+      return false;
+    }
+  });
   const [skillLevel, setSkillLevel] = useState<SkillLevel>('Beginner');
   const [report, setReport] = useState<ContribLensAnalysisResponse>(INITIAL_ANALYSIS_REPORT);
   const [activePlan, setActivePlan] = useState<ContributionPlan>(INITIAL_CONTRIBUTION_PLAN);
@@ -191,6 +199,20 @@ export default function App() {
       fetchUserProfile();
     }
   }, [fetchUserProfile]);
+
+  useEffect(() => {
+    const rootEl = document.documentElement;
+    if (isDarkMode) {
+      rootEl.classList.add('dark-mode');
+    } else {
+      rootEl.classList.remove('dark-mode');
+    }
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, isDarkMode ? 'dark' : 'light');
+    } catch {
+      // Ignore storage error
+    }
+  }, [isDarkMode]);
 
   const handleVerifyTokenForPreview = async (personalAccessToken: string) => {
     setErrorMessage(null);
@@ -557,7 +579,12 @@ export default function App() {
   ];
 
   return (
-    <div id="top" className="min-h-screen flex flex-col bg-green-grid text-[#111827]">
+    <div
+      id="top"
+      className={`min-h-screen flex flex-col bg-green-grid text-[#111827] ${
+        isDarkMode ? 'dark-mode' : ''
+      }`}
+    >
       {/* Top Green Accent Line */}
       <div className="h-1 w-full bg-gradient-to-r from-[#14532D] via-[#15803D] to-[#22C55E]" />
 
@@ -570,6 +597,8 @@ export default function App() {
         authenticatedUser={authProfile?.user || null}
         onConnectGitHub={handleConnectGitHub}
         isConnectingGitHub={isConnectingGitHub}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode((prev) => !prev)}
       />
 
       {/* Mobile Navigation Bar */}
@@ -608,7 +637,7 @@ export default function App() {
       />
 
       {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 pb-24">
         {activeTab === 'overview' && (
           <OverviewSection
             report={report}
@@ -710,13 +739,15 @@ export default function App() {
         onVerifyTokenForPreview={handleVerifyTokenForPreview}
       />
 
-      {/* ContribBot Floating OSS Mentor & Troubleshooting Assistant */}
-      <ContribBotWidget
-        report={report}
-        activePlan={activePlan}
-        skillLevel={skillLevel}
-        activeUserLogin={authProfile?.user?.login || browsedProfile?.user?.login || null}
-      />
+      {/* ContribBot Floating OSS Mentor & Troubleshooting Assistant (Only on Overview dashboard) */}
+      {activeTab === 'overview' && (
+        <ContribBotWidget
+          report={report}
+          activePlan={activePlan}
+          skillLevel={skillLevel}
+          activeUserLogin={authProfile?.user?.login || browsedProfile?.user?.login || null}
+        />
+      )}
 
       {/* Quiet Footer */}
       <footer className="border-t border-[#DDE5DF] bg-white py-6 px-6 mt-16">

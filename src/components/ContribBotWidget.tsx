@@ -199,7 +199,7 @@ export const ContribBotWidget: React.FC<ContribBotWidgetProps> = ({
   const initialMessage: ChatMessage = {
     id: 'welcome',
     role: 'assistant',
-    content: `Hi! I'm your **Contribution Mentor**, here to help you navigate open-source repositories and contributions.
+    content: `Hi! I'm **ContribBot**, your open-source contribution & troubleshooting assistant.
 
 I'm ready to help with **${repoDisplayName}** and Issue **#${activePlan.issueNumber}**. Ask me anything about picking an issue, setting up tests, fixing Git/PR conflicts, or connecting your GitHub account!`,
     timestamp: 'Just now',
@@ -384,17 +384,21 @@ I'm ready to help with **${repoDisplayName}** and Issue **#${activePlan.issueNum
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-40">
-      {/* Floating Launcher Button when closed */}
+    <div className="fixed bottom-24 right-6 mb-3 z-40">
+      {/* Compact Spherical Floating Launcher Button when closed */}
       {!isOpen && (
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="px-4 py-3 rounded-lg bg-[#15803D] hover:bg-[#166534] text-white font-semibold text-xs shadow-lg border border-[#14532D] transition-all flex items-center gap-2.5 cursor-pointer"
-          aria-label="Open Contribution Mentor"
+          className="relative w-13 h-13 rounded-full bg-[#15803D] hover:bg-[#166534] text-white shadow-xl border-2 border-white/90 transition-transform hover:scale-105 flex items-center justify-center cursor-pointer group"
+          aria-label="Open ContribBot"
+          title="ContribBot"
         >
-          <Bot className="w-4 h-4" />
-          <span>Contribution Mentor</span>
+          <Bot className="w-6 h-6" />
+          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#22C55E] border-2 border-white" />
+          <span className="pointer-events-none absolute right-15 px-2.5 py-1 rounded-md bg-[#0B0F0D] text-white text-[11px] font-mono font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-md">
+            ContribBot
+          </span>
         </button>
       )}
 
@@ -403,19 +407,19 @@ I'm ready to help with **${repoDisplayName}** and Issue **#${activePlan.issueNum
         <div
           className={`flex flex-col bg-white border border-[#DDE5DF] rounded-2xl shadow-xl overflow-hidden transition-all ${
             isExpanded
-              ? 'w-[92vw] sm:w-[560px] h-[78vh] max-h-[680px]'
-              : 'w-[90vw] sm:w-[410px] h-[540px] max-h-[80vh]'
+              ? 'w-[92vw] sm:w-[560px] h-[72vh] max-h-[640px]'
+              : 'w-[90vw] sm:w-[400px] h-[500px] max-h-[74vh]'
           }`}
         >
           {/* Header */}
           <div className="px-4 py-3 bg-[#F8FAF9] border-b border-[#DDE5DF] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-[#15803D]/10 border border-[#15803D]/30 flex items-center justify-center text-[#15803D] shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#15803D] flex items-center justify-center text-white shrink-0">
                 <Bot className="w-4 h-4" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs font-bold text-[#0B0F0D]">Contribution Mentor</h3>
+                  <h3 className="text-xs font-bold text-[#0B0F0D]">ContribBot</h3>
                   <span className="text-[10px] font-mono text-[#15803D] font-semibold">
                     · ContribLens
                   </span>
@@ -451,7 +455,7 @@ I'm ready to help with **${repoDisplayName}** and Issue **#${activePlan.issueNum
                 type="button"
                 onClick={() => setIsOpen(false)}
                 className="p-1.5 text-[#64748B] hover:text-[#0B0F0D] rounded-lg transition-colors cursor-pointer"
-                title="Close Contribution Mentor"
+                title="Close ContribBot"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -481,7 +485,7 @@ I'm ready to help with **${repoDisplayName}** and Issue **#${activePlan.issueNum
                   )}
                 </div>
                 <span className="text-[10px] font-mono text-[#64748B] mt-1 px-1">
-                  {msg.role === 'user' ? 'You' : 'Mentor'} · {msg.timestamp}
+                  {msg.role === 'user' ? 'You' : 'ContribBot'} · {msg.timestamp}
                 </span>
               </div>
             ))}
@@ -489,7 +493,7 @@ I'm ready to help with **${repoDisplayName}** and Issue **#${activePlan.issueNum
             {isSending && (
               <div className="flex items-center gap-2 text-xs text-[#15803D] font-mono px-2 py-1">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Analyzing repository context...</span>
+                <span>ContribBot is analyzing...</span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -524,8 +528,8 @@ I'm ready to help with **${repoDisplayName}** and Issue **#${activePlan.issueNum
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={`Ask about ${repoDisplayName}, Git PRs, or OAuth...`}
-              aria-label="Ask Contribution Mentor a question"
+              placeholder={`Ask ContribBot about ${repoDisplayName}, Git PRs, or OAuth...`}
+              aria-label="Ask ContribBot a question"
               className="flex-1 bg-transparent text-xs text-[#0B0F0D] placeholder:text-[#64748B] focus:outline-none"
             />
             <button

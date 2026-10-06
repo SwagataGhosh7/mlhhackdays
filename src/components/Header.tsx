@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Github, UserSearch } from 'lucide-react';
+import { ExternalLink, Github, Moon, Sun, UserSearch } from 'lucide-react';
 import { GitHubUserProfile } from '../types';
 
 export type ActiveTab =
@@ -20,6 +20,8 @@ interface HeaderProps {
   authenticatedUser: GitHubUserProfile | null;
   onConnectGitHub: () => void;
   isConnectingGitHub: boolean;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,6 +32,8 @@ export const Header: React.FC<HeaderProps> = ({
   authenticatedUser,
   onConnectGitHub,
   isConnectingGitHub,
+  isDarkMode = false,
+  onToggleDarkMode,
 }) => {
   const [imgError, setImgError] = useState(false);
 
@@ -82,8 +86,30 @@ export const Header: React.FC<HeaderProps> = ({
         })}
       </nav>
 
-      {/* Zone 3: Separate Browse Profile Button + Export PDF + Dedicated Connect GitHub Auth Button */}
+      {/* Zone 3: Dark Mode Toggle + Separate Browse Profile Button + Export PDF + Dedicated Connect GitHub Auth Button */}
       <div className="flex items-center gap-2.5">
+        {onToggleDarkMode && (
+          <button
+            type="button"
+            onClick={onToggleDarkMode}
+            className="px-3 py-2 text-xs font-semibold text-[#111827] bg-white border border-[#DDE5DF] hover:border-[#15803D] rounded-lg transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {isDarkMode ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-[#22C55E]" />
+                <span className="hidden sm:inline">Light</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-[#15803D]" />
+                <span className="hidden sm:inline">Dark</span>
+              </>
+            )}
+          </button>
+        )}
+
         <button
           type="button"
           onClick={() => onSelectTab('browse')}

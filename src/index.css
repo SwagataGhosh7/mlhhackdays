@@ -50,6 +50,76 @@
   background-size: 32px 32px;
 }
 
+/* Dark Mode Theme System (Green + Near-Black/Charcoal + Crisp White Text) */
+html.dark-mode body,
+.dark-mode.bg-green-grid,
+.dark-mode .bg-green-grid {
+  background-color: #0B0F0D !important;
+  background-image:
+    linear-gradient(to right, rgba(34, 197, 94, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 197, 94, 0.16) 1px, transparent 1px) !important;
+  background-size: 32px 32px !important;
+  color: #F1F5F3 !important;
+}
+
+.dark-mode .bg-green-grid-surface {
+  background-color: #111827 !important;
+  background-image:
+    linear-gradient(to right, rgba(34, 197, 94, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 197, 94, 0.14) 1px, transparent 1px) !important;
+  background-size: 32px 32px !important;
+}
+
+.dark-mode .bg-white,
+.dark-mode .bg-white\/95 {
+  background-color: #111827 !important;
+}
+
+.dark-mode .bg-\[\#F8FAF9\] {
+  background-color: #0B0F0D !important;
+}
+
+.dark-mode .bg-\[\#F1F5F3\] {
+  background-color: #18221D !important;
+}
+
+.dark-mode .text-\[\#0B0F0D\] {
+  color: #F8FAF9 !important;
+}
+
+.dark-mode .text-\[\#111827\] {
+  color: #E2E8F0 !important;
+}
+
+.dark-mode .text-\[\#64748B\] {
+  color: #94A3B8 !important;
+}
+
+.dark-mode .text-\[\#15803D\],
+.dark-mode .text-\[\#166534\] {
+  color: #22C55E !important;
+}
+
+.dark-mode .border-\[\#DDE5DF\] {
+  border-color: #1F2E26 !important;
+}
+
+.dark-mode .divide-\[\#DDE5DF\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1F2E26 !important;
+}
+
+.dark-mode input,
+.dark-mode select,
+.dark-mode textarea {
+  background-color: #0B0F0D !important;
+  color: #F8FAF9 !important;
+  border-color: #263B30 !important;
+}
+
+.dark-mode tr.hover\:bg-\[\#F8FAF9\]:hover {
+  background-color: #16221B !important;
+}
+
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
