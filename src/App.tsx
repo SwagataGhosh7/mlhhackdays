@@ -4,7 +4,19 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Header, ActiveTab } from './components/Header';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Compass,
+  GitPullRequest,
+  LayoutGrid,
+  MessageSquare,
+  ShieldAlert,
+  Sparkles,
+  UserCheck,
+  UserSearch,
+} from 'lucide-react';
+import { Header, ActiveTab, DASHBOARD_DIRECTORY } from './components/Header';
 import { RepoCommandBar } from './components/RepoCommandBar';
 import { OverviewSection } from './components/OverviewSection';
 import { RecommendedIssuesSection } from './components/RecommendedIssuesSection';
@@ -41,8 +53,52 @@ const ACCESS_TOKEN_STORAGE_KEY = 'contriblens_gh_access_token';
 const AUTHORIZED_CONFIRM_KEY = 'contriblens_gh_explicitly_authorized';
 const THEME_STORAGE_KEY = 'contriblens_theme_mode';
 
+const VALID_TABS: ActiveTab[] = [
+  'overview',
+  'recommendations',
+  'plan',
+  'risks',
+  'issues',
+  'discussion',
+  'browse',
+  'profile',
+];
+
+function getInitialTabFromHash(): ActiveTab {
+  if (typeof window === 'undefined') return 'overview';
+  const rawHash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase();
+  if (VALID_TABS.includes(rawHash as ActiveTab)) {
+    return rawHash as ActiveTab;
+  }
+  return 'overview';
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  const [activeTab, setActiveTabState] = useState<ActiveTab>(getInitialTabFromHash);
+
+  const setActiveTab = useCallback((tab: ActiveTab) => {
+    setActiveTabState(tab);
+    if (typeof window !== 'undefined') {
+      const targetHash = `#/${tab}`;
+      if (window.location.hash !== targetHash) {
+        window.history.pushState(null, '', targetHash);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const nextTab = getInitialTabFromHash();
+      setActiveTabState(nextTab);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleHashChange);
+    };
+  }, []);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem(THEME_STORAGE_KEY) === 'dark';
@@ -567,16 +623,66 @@ export default function App() {
     }
   };
 
-  const mobileTabs: Array<{ id: ActiveTab; label: string }> = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'recommendations', label: 'Recommended' },
-    { id: 'plan', label: 'Contribution Plan' },
-    { id: 'risks', label: 'Risks' },
-    { id: 'issues', label: 'Issues' },
-    { id: 'discussion', label: 'Discussion' },
-    { id: 'browse', label: 'Browse Profile' },
-    { id: 'profile', label: 'My GitHub & Repos' },
+  const separateDashboards: Array<{
+    id: ActiveTab;
+    label: string;
+    subtitle: string;
+    metricLabel: string;
+    icon: React.ReactNode;
+  }> = [
+    {
+      id: 'recommendations',
+      label: 'Recommended Issues',
+      subtitle: 'Skill-matched issues & impact scores',
+      metricLabel: `${report.recommendedIssues.length} matched`,
+      icon: <Sparkles className="w-4 h-4 text-[#15803D]" />,
+    },
+    {
+      id: 'plan',
+      label: 'Contribution Plan',
+      subtitle: 'Step-by-step PR execution & simulator',
+      metricLabel: `Issue #${activePlan.issueNumber}`,
+      icon: <GitPullRequest className="w-4 h-4 text-[#15803D]" />,
+    },
+    {
+      id: 'risks',
+      label: 'Maintenance Risks',
+      subtitle: 'Bus factor & review bottleneck audit',
+      metricLabel: `${report.maintenanceRisks.length} risk signals`,
+      icon: <ShieldAlert className="w-4 h-4 text-[#15803D]" />,
+    },
+    {
+      id: 'issues',
+      label: 'Issue Explorer',
+      subtitle: 'Open GitHub issues & codebase tree',
+      metricLabel: `${report.openIssues.length} open issues`,
+      icon: <Compass className="w-4 h-4 text-[#15803D]" />,
+    },
+    {
+      id: 'discussion',
+      label: 'General Discussion',
+      subtitle: 'Community Q&A & maintainer threads',
+      metricLabel: 'Discussion hub',
+      icon: <MessageSquare className="w-4 h-4 text-[#15803D]" />,
+    },
+    {
+      id: 'browse',
+      label: 'Browse Profile',
+      subtitle: 'Inspect any public GitHub contributor',
+      metricLabel: browsedProfile?.user?.login ? `@${browsedProfile.user.login}` : 'Public lookup',
+      icon: <UserSearch className="w-4 h-4 text-[#15803D]" />,
+    },
+    {
+      id: 'profile',
+      label: 'My GitHub & Repos',
+      subtitle: 'Your connected account & PR history',
+      metricLabel: authProfile?.user?.login ? `@${authProfile.user.login}` : 'Account dashboard',
+      icon: <UserCheck className="w-4 h-4 text-[#15803D]" />,
+    },
   ];
+
+  const activeDashboardMeta =
+    DASHBOARD_DIRECTORY.find((d) => d.id === activeTab) || DASHBOARD_DIRECTORY[0];
 
   return (
     <div
@@ -588,7 +694,7 @@ export default function App() {
       {/* Top Green Accent Line */}
       <div className="h-1 w-full bg-gradient-to-r from-[#14532D] via-[#15803D] to-[#22C55E]" />
 
-      {/* 3-Zone Top Navigation Header */}
+      {/* Top Product Navigation Header (ContribLens + Overview + Dashboards Selector + Connect GitHub) */}
       <Header
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
@@ -601,50 +707,134 @@ export default function App() {
         onToggleDarkMode={() => setIsDarkMode((prev) => !prev)}
       />
 
-      {/* Mobile Navigation Bar */}
-      <div className="xl:hidden flex items-center gap-1 px-4 py-2 bg-white border-b border-[#DDE5DF] overflow-x-auto">
-        {mobileTabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => handleSelectTab(tab.id)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-[#15803D] text-white font-semibold'
-                : 'text-[#64748B] hover:text-[#111827]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Home View: Repository Command Bar is displayed on Home (Overview) */}
+      {activeTab === 'overview' ? (
+        <RepoCommandBar
+          repo={report.repo}
+          hasAnalyzedRepo={hasAnalyzedRepo}
+          skillLevel={skillLevel}
+          onSkillLevelChange={(newLevel) => {
+            setSkillLevel(newLevel);
+          }}
+          onAnalyzeRepo={handleAnalyzeRepo}
+          onBrowseUser={handleBrowseGitHubUser}
+          onOpenBrowseProfileTab={handleOpenBrowseProfileTab}
+          isAnalyzing={isAnalyzing}
+          errorMessage={errorMessage}
+          recentRepos={recentRepos}
+          userRepos={authProfile?.accessibleRepos || []}
+        />
+      ) : (
+        /* Dedicated Dashboard Header Banner when redirected to a non-Overview dashboard */
+        <section className="border-b-2 border-[#15803D] bg-green-grid-surface">
+          <div className="max-w-7xl mx-auto px-6 py-5 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-xs font-mono text-[#15803D]">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTab('overview')}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#15803D]/40 text-[#15803D] font-semibold hover:bg-[#15803D] hover:text-white transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Overview (Home)</span>
+                  </button>
+                  <span className="text-[#64748B]">/</span>
+                  <span className="font-semibold text-[#0B0F0D]">
+                    {activeDashboardMeta.label}
+                  </span>
+                </div>
+                <p className="text-xs text-[#64748B] pt-1">
+                  {activeDashboardMeta.description}
+                </p>
+              </div>
 
-      {/* Repository Input & Skill Targeting Command Bar */}
-      <RepoCommandBar
-        repo={report.repo}
-        hasAnalyzedRepo={hasAnalyzedRepo}
-        skillLevel={skillLevel}
-        onSkillLevelChange={(newLevel) => {
-          setSkillLevel(newLevel);
-        }}
-        onAnalyzeRepo={handleAnalyzeRepo}
-        onBrowseUser={handleBrowseGitHubUser}
-        onOpenBrowseProfileTab={handleOpenBrowseProfileTab}
-        isAnalyzing={isAnalyzing}
-        errorMessage={errorMessage}
-        recentRepos={recentRepos}
-        userRepos={authProfile?.accessibleRepos || []}
-      />
+              {/* Separate Click Button Options to Redirect Between Dashboards */}
+              <div className="flex flex-wrap items-center gap-2">
+                {separateDashboards.map((dash) => {
+                  const isCurrent = activeTab === dash.id;
+                  return (
+                    <button
+                      key={dash.id}
+                      type="button"
+                      onClick={() => handleSelectTab(dash.id)}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                        isCurrent
+                          ? 'bg-[#15803D] text-white border-[#15803D]'
+                          : 'bg-white text-[#111827] border-[#DDE5DF] hover:border-[#15803D] hover:text-[#15803D]'
+                      }`}
+                    >
+                      {dash.icon}
+                      <span>{dash.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 pb-24">
         {activeTab === 'overview' && (
-          <OverviewSection
-            report={report}
-            onSelectIssueForPlan={handleSelectRecommendedIssue}
-            onNavigateTab={handleSelectTab}
-            isGeneratingPlan={isGeneratingPlan}
-          />
+          <div className="space-y-10">
+            {/* Separate Click Button Options for All Specialized Dashboards */}
+            <section className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-[#15803D]" />
+                  <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B0F0D]">
+                    Workspace Dashboards — Click Any Option to Open Dashboard
+                  </h2>
+                </div>
+                <span className="text-xs font-mono text-[#64748B]">
+                  Overview is shown on Home · Click a button below to redirect to a dedicated dashboard
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+                {separateDashboards.map((dash) => (
+                  <button
+                    key={dash.id}
+                    type="button"
+                    onClick={() => handleSelectTab(dash.id)}
+                    className="group text-left p-3.5 rounded-xl bg-white/95 border border-[#166534]/40 hover:border-[#15803D] hover:shadow-sm transition-all flex flex-col justify-between gap-3 cursor-pointer"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="p-1.5 rounded-lg bg-[#F8FAF9] border border-[#DDE5DF] group-hover:border-[#15803D]/50 transition-colors">
+                          {dash.icon}
+                        </div>
+                        <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-[#F1F5F3] text-[#15803D] border border-[#DDE5DF] truncate">
+                          {dash.metricLabel}
+                        </span>
+                      </div>
+                      <div className="text-xs font-bold text-[#0B0F0D] group-hover:text-[#15803D] transition-colors">
+                        {dash.label}
+                      </div>
+                      <p className="text-[11px] text-[#64748B] leading-snug line-clamp-2">
+                        {dash.subtitle}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-[#DDE5DF]/70 flex items-center justify-between text-[11px] font-semibold text-[#15803D]">
+                      <span>Open Dashboard</span>
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {/* Home Overview Dashboard Content */}
+            <OverviewSection
+              report={report}
+              onSelectIssueForPlan={handleSelectRecommendedIssue}
+              onNavigateTab={handleSelectTab}
+              isGeneratingPlan={isGeneratingPlan}
+            />
+          </div>
         )}
 
         {activeTab === 'recommendations' && (
