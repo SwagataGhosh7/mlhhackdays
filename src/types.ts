@@ -43,6 +43,14 @@ export interface GitHubIssueItem {
   labels: string[];
 }
 
+export interface DailyContributionPoint {
+  date: string;
+  dayLabel: string;
+  commits: number;
+  prsAndIssues: number;
+  total: number;
+}
+
 export interface RepoActivityStats {
   recentCommitsCount: number;
   daysSinceLastCommit: number;
@@ -55,6 +63,7 @@ export interface RepoActivityStats {
   beginnerFriendlyIssuesCount: number;
   topContributorSharePercent: number;
   top3ContributorsSharePercent: number;
+  contributionTrend30d?: DailyContributionPoint[];
 }
 
 export interface FileTreeItem {
